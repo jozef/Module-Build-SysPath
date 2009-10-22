@@ -1,0 +1,4 @@
+Revision history for Module-Build-SysPath
+
+0.09    20 Oct 2009
+    - created by splitting from Sys::Path distribution
