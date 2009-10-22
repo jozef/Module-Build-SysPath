@@ -22,7 +22,7 @@ See first L<Sys::Path>.
 use warnings;
 use strict;
 
-our $VERSION = '0.09';
+our $VERSION = '0.09_01';
 
 use base 'Module::Build';
 use Sys::Path;
