@@ -1,5 +1,7 @@
 package Module::Build::SysPath;
 
+=encoding utf-8
+
 =head1 NAME
 
 Module::Build::SysPath - Module::Build subclass with Sys::Path used in new() and ACTION_install()
@@ -17,12 +19,14 @@ A subclass of L<Module::Build>.
 
 See first L<Sys::Path>.
 
+See L<Acme::SysPath> for example usage.
+
 =cut
 
 use warnings;
 use strict;
 
-our $VERSION = '0.09_01';
+our $VERSION = '0.09';
 
 use base 'Module::Build';
 use Sys::Path;
@@ -30,6 +34,7 @@ use List::MoreUtils 'any';
 use FindBin '$Bin';
 use Digest::MD5 qw(md5_hex);
 use Text::Diff 'diff';
+use File::Spec;
 
 our $sys_path_config_name = 'SPc';
 
