@@ -26,7 +26,7 @@ See L<Acme::SysPath> for example usage.
 use warnings;
 use strict;
 
-our $VERSION = '0.09';
+our $VERSION = '0.10';
 
 use base 'Module::Build';
 use Sys::Path;
