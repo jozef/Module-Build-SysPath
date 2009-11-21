@@ -1,5 +1,8 @@
 Revision history for Module-Build-SysPath
 
+0.11    20 Nov 2009
+    - A looooot of Pod
+
 0.10    30 Oct 2009
     - fixed dependency on Sys::Path 0.09
 

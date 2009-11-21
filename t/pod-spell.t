@@ -27,5 +27,9 @@ add_stopwords(qw(
 	localstatedir
 	sysconfdir
 	TODO
+	advices
+	blog
+	IRC
+	commiting
 ));
 all_pod_files_spelling_ok();
