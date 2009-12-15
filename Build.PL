@@ -14,6 +14,7 @@ my $builder = Module::Build->new(
         'Digest::MD5'     => 0,
         'Text::Diff'      => 0,
         'File::Spec'      => 0,
+        'File::Basename'  => 0,
     },
     build_requires => {
         'Test::More'    => 0,

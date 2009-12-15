@@ -18,7 +18,6 @@ DESCRIPTION
 
 USAGE
   module-starter
-
         module-starter --builder=Module::Build --module=Acme::NewModule --author="Pod" --email=pod@pod
         cd Acme-NewModule/
         perl -lane 's/Module::Build-/Module::Build::SysPath-/; print $_;' -i Build.PL 
@@ -28,7 +27,6 @@ USAGE
         # add "Module::Build::SysPath' => 0.10," to build_requires
 
   create SPc.pm
-
     copy http://github.com/jozef/Sys-Path/blob/master/examples/SPc.pm and
     add it to your source tree. Clean up the paths that you don't need.
     Local distribution folder names can be changed to anyones taste. For
@@ -40,7 +38,6 @@ USAGE
     folder will be installed to Sys::Path->sysconfdir().
 
   use the SPc.pm
-
     Calling `Acme::NewModule::SPc->sysconfdir' before the distribution is
     installed will return path to the 'conf' folder in the distribution root
     folder. Calling it after install the distribution will return
@@ -51,7 +48,6 @@ EXAMPLE
     example.
 
   new
-
     Populates:
 
         $builder->{'properties'}->{$path_type.'_files'} = ...;
@@ -123,7 +119,6 @@ EXAMPLE
         adding suffix -old and distribution conffile is installed.
 
   ACTION_install
-
     This action is responsible for renaming files, replacing SPc.pm paths to
     systems once from Sys::Path. Also makes files writeable (chmod 0644).
     And stores the checksums of conffiles.
@@ -149,11 +144,9 @@ BUGS
 
 SUPPORT
   Mailing list
-
     http://lists.meon.sk/mailman/listinfo/sys-path
 
   The rest
-
     You can find documentation for this module with the perldoc command.
 
         perldoc Sys::Path

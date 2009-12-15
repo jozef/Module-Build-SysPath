@@ -69,6 +69,7 @@ use FindBin '$Bin';
 use Digest::MD5 qw(md5_hex);
 use Text::Diff 'diff';
 use File::Spec;
+use File::Basename 'basename';
 
 our $sys_path_config_name = 'SPc';
 
@@ -196,9 +197,18 @@ sub new {
         my $non_persistant = (any { $_ eq $path_type} qw(cachedir logdir spooldir rundir lockdir sharedstatedir));
         if (-d $sys_path) {
             my %files;
+            my @ignore_folders;
             foreach my $file (@{$builder->rscan_dir($sys_path)}) {
-                # skip folders
-                next if -d $file;
+                # skip folders, but remember folders with . prefix
+                if (-d $file) {
+                    $file =~ s/$distribution_root.//;
+
+                    # ignore folders with . prefix
+                    push @ignore_folders, File::Spec->catfile($file, '')    # File::Spec with empty string to add portable trailing slash
+                        if (basename($file) =~ m{^\.} and (not exists $builder->{'properties'}->{$path_type.'_files'}->{$file}));
+
+                    next;
+                }
                 
                 my $blib_file = $file;
                 my $dest_file = $file;
@@ -212,6 +222,18 @@ sub new {
                     $non_persistant
                     and ($file !~ m/\.exists$/)
                     and (not exists $builder->{'properties'}->{$path_type.'_files'}->{$file})
+                ;
+                
+                # skip files from .folders, only include explicitely wanted
+                next if any {
+                    ($file =~ m/^$_/)
+                    and (not exists $builder->{'properties'}->{$path_type.'_files'}->{$file})
+                } @ignore_folders;
+                
+                # skip files with . prefix
+                next if
+                    (basename($file) =~ m/^\./)
+                    and (basename($file) ne '.exists')
                 ;
                 
                 # print 'file>  ', $file, "\n";
