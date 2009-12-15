@@ -60,7 +60,7 @@ See L<Acme::SysPath> for a really simple, L<Test::Daily> for a real world exampl
 use warnings;
 use strict;
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 use base 'Module::Build';
 use Sys::Path;
