@@ -60,7 +60,7 @@ See L<Acme::SysPath> for a really simple, L<Test::Daily> for a real world exampl
 use warnings;
 use strict;
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 
 use base 'Module::Build';
 use Sys::Path;
@@ -69,7 +69,8 @@ use FindBin '$Bin';
 use Digest::MD5 qw(md5_hex);
 use Text::Diff 'diff';
 use File::Spec;
-use File::Basename 'basename';
+use File::Basename 'basename', 'dirname';
+use File::Path 'make_path';
 
 our $sys_path_config_name = 'SPc';
 
@@ -180,6 +181,7 @@ sub new {
     my %rename_in_system;
     my %conffiles_in_system;
     my @writefiles_in_system;
+    my @create_folders_in_system;
     foreach my $path_type ($module->_path_types) {
         my $sys_path     = $module->$path_type;
         my $install_path = Sys::Path->$path_type;
@@ -217,10 +219,13 @@ sub new {
                 $blib_file    =~ s/^$sys_path.//;
                 $blib_file    = File::Spec->catfile($path_type, $blib_file);
                 
+                # allow empty directories to be created
+                push @create_folders_in_system, dirname($dest_file)
+                    if (basename($file) eq '.exists');
+                
                 # skip non-persistant folders, only include explicitely wanted and .exists files
                 next if
                     $non_persistant
-                    and ($file !~ m/\.exists$/)
                     and (not exists $builder->{'properties'}->{$path_type.'_files'}->{$file})
                 ;
                 
@@ -289,6 +294,7 @@ sub new {
     $builder->notes('rename_in_system'     => \%rename_in_system);
     $builder->notes('conffiles_in_system'  => \%conffiles_in_system);
     $builder->notes('writefiles_in_system' => \@writefiles_in_system);
+    $builder->notes('create_folders_in_system' => \@create_folders_in_system);
     
     return $builder;
 }
@@ -311,6 +317,15 @@ sub ACTION_install {
         while (my ($system_file, $new_system_file) = each %rename_in_system) {
             print 'Moving ', $system_file,' -> ', $new_system_file, "\n";
             rename($system_file, $new_system_file) or die $!;
+        }
+    }
+    
+    # create requested folders
+    foreach my $folder (@{$builder->notes('create_folders_in_system')}) {
+        $folder = File::Spec->catdir($destdir || (), $folder);
+        if (not -d $folder) {
+            print 'Creating '.$folder.' folder', "\n";
+            make_path($folder);
         }
     }
 

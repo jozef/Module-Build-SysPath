@@ -15,6 +15,7 @@ my $builder = Module::Build->new(
         'Text::Diff'      => 0,
         'File::Spec'      => 0,
         'File::Basename'  => 0,
+        'File::Path'      => 0,
     },
     build_requires => {
         'Test::More'    => 0,

@@ -1,5 +1,8 @@
 Revision history for Module-Build-SysPath
 
+0.13    12 Feb 2009
+    - fixed empty folders (having .exists) creation
+
 0.12    15 Dec 2009
     - skip files and folders with . prefix (was making problems when distribution was an SVN/CVS checkout)
 
