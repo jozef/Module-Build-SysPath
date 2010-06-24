@@ -4,7 +4,7 @@ package Module::Build::SysPath;
 
 =head1 NAME
 
-Module::Build::SysPath - Module::Build subclass with Sys::Path used in new() and ACTION_install()
+Module::Build::SysPath - install files to system folders according to FHS (or Sys::Path settings)
 
 =head1 SYNOPSIS
 
@@ -60,7 +60,7 @@ See L<Acme::SysPath> for a really simple, L<Test::Daily> for a real world exampl
 use warnings;
 use strict;
 
-our $VERSION = '0.13';
+our $VERSION = '0.14';
 
 use base 'Module::Build';
 use Sys::Path;
