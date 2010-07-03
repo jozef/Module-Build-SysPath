@@ -63,7 +63,7 @@ use strict;
 our $VERSION = '0.14';
 
 use base 'Module::Build';
-use Sys::Path;
+use Sys::Path 0.11;
 use List::MoreUtils 'any';
 use FindBin '$Bin';
 use Digest::MD5 qw(md5_hex);

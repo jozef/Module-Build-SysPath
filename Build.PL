@@ -9,7 +9,7 @@ my $builder = Module::Build->new(
     dist_author         => 'Jozef Kutej <jkutej@cpan.org>',
     dist_version_from   => 'lib/Module/Build/SysPath.pm',
     requires => {
-        'Sys::Path'       => 0.09,
+        'Sys::Path'       => 0.11,
         'List::MoreUtils' => 0,
         'Digest::MD5'     => 0,
         'Text::Diff'      => 0,
@@ -20,6 +20,7 @@ my $builder = Module::Build->new(
     build_requires => {
         'Test::More'    => 0,
         'Test::Compile' => 0.08,
+        'Test::Dirs'    => 0,
     },
     add_to_cleanup      => [ 'Module-Build-SysPath-*' ],
     create_readme       => 1,

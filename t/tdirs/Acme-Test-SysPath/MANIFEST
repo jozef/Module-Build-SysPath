@@ -1,0 +1,18 @@
+Build.PL
+cache/cache/.exists
+conf/acme-test-syspath.cfg
+doc/doc
+lib/Acme/Test/SysPath.pm
+lib/Acme/Test/SysPath/SPc.pm
+locale/locale
+lock/lock/.exists
+log/log/.exists
+MANIFEST			This list of files
+META.yml
+run/run/.exists
+share/share
+spool/spool/.exists
+state/state/.exists
+www/.hidden/hidden
+www/empty/.exists
+www/www

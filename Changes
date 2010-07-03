@@ -1,5 +1,8 @@
 Revision history for Module-Build-SysPath
 
+0.14    24 Jun 2010
+    - Added testing using Test::Dirs
+
 0.13    12 Feb 2009
     - fixed empty folders (having .exists) creation
 

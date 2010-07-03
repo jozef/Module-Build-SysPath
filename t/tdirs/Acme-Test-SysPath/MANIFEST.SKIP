@@ -31,5 +31,3 @@
 ^tmp/
 .*\.tar\.gz
 ^MYMETA.yml$
-^Module-Build-SysPath-
-
