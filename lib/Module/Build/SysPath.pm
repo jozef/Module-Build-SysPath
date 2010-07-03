@@ -42,7 +42,7 @@ folder names can be changed to anyones taste. For example:
 
     sub sysconfdir { File::Spec->catdir(__PACKAGE__->prefix, 'conf') };
 
-'conf' is the name of a folder with conffiles. All file put to this folder
+'conf' is the name of a folder with C<conffile>s. All file put to this folder
 will be installed to L<Sys::Path>->sysconfdir().
 
 =head2 use the SPc.pm
@@ -99,36 +99,36 @@ Files in:
     lockdir
     sharedstatedir
 
-are skipped during the instalation. Add F<.exists> to this folders if you
+are skipped during the installation. Add F<.exists> to this folders if you
 want them to be created during `./Build install`.
 
 Configuration files get a special (Debian like) treatment. All files in
 C<sysconfdir> and all files specified as C<< $builder->{'properties'}->{'conffiles'} >>
-are configuration files. Using L<Sys::Path/install_checksums> the conffiles
+are configuration files. Using L<Sys::Path/install_checksums> the c<conffile>s
 checksums are tracked. Here are the model situations:
 
 =over 4
 
-=item conffile was never installed jet
+=item C<conffile> was never installed jet
 
 The file is just copied in place (to sysconfdir) as it is. MD5 is recorded.
 
 =item distribution ships new version, no change in system
 
-The distribution changed the conffile (for example by adding new values),
-but the conffile was untouched in the system. Then the new version from
+The distribution changed the C<conffile> (for example by adding new values),
+but the C<conffile> was untouched in the system. Then the new version from
 distribution replaces the one in the system.
 
-=item distribution conffile wasn't changed, conffile changed in system
+=item distribution C<conffile> wasn't changed, C<conffile> changed in system
 
-Already installed distribution is getting upgrade. Distribution conffiles form
-installed and the new version didn't change. But the conffile was changed in
-the system. No prompt and the conffile is kept intact.
+Already installed distribution is getting upgrade. Distribution C<conffile>s form
+installed and the new version didn't change. But the C<conffile> was changed in
+the system. No prompt and the C<conffile> is kept intact.
 
-=item distribution conffile change, conffile changed in system
+=item distribution C<conffile> change, C<conffile> changed in system
 
 Already installed distribution is getting upgrade. When both the distribution
-changed the conffile and the conffile was changed in the system. User will
+changed the C<conffile> and the C<conffile> was changed in the system. User will
 be prompted what to do:
 
     Installing new version of config file /etc/SOMEFILE ...
@@ -146,8 +146,8 @@ be prompted what to do:
     *** /etc/SOMEFILE (Y/I/N/O/D/Z) ?
 
 If N or O is selected distribution files is installed with F<-spc>
-suffix. If Y or I is selected the system conffile is renamed by adding
-suffix F<-old> and distribution conffile is installed.
+suffix. If Y or I is selected the system C<conffile> is renamed by adding
+suffix F<-old> and distribution C<conffile> is installed.
 
 =back
 
@@ -168,6 +168,7 @@ sub new {
     };
     
     my $distribution_root = Sys::Path->find_distribution_root($builder->module_name);
+    print 'dist root is ', $distribution_root, "\n";
     
     # map conf files to array of real paths
     my @conffiles = (
@@ -277,14 +278,14 @@ sub new {
                 # add file the the Build.PL _files list
                 $files{$file} = $blib_file;
 
-                # make the conf and state files writeable in the system
+                # make the conf and state files writable in the system
                 push @writefiles_in_system, $dest_file
                     if any { $_ eq $path_type } qw(sharedstatedir sysconfdir);                
             }
             $builder->{'properties'}->{$path_type.'_files'} = \%files;
         }
                 
-        # set instalation paths
+        # set installation paths
         $builder->{'properties'}->{'install_path'}->{$path_type} = $install_path;
         
         # add build elements of the path types
@@ -302,8 +303,8 @@ sub new {
 =head2 ACTION_install
 
 This action is responsible for renaming files, replacing F<SPc.pm> paths
-to systems once from L<Sys::Path>. Also makes files writeable (chmod 0644).
-And stores the checksums of conffiles.
+to systems once from L<Sys::Path>. Also makes files writable (chmod 0644).
+And stores the checksums of C<conffile>s.
 
 =cut
 

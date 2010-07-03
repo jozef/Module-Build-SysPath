@@ -31,5 +31,10 @@ add_stopwords(qw(
 	blog
 	IRC
 	commiting
+	conffile
+	FHS
+	SPc
+	conf
+	pm
 ));
 all_pod_files_spelling_ok();
