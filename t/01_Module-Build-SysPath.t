@@ -9,6 +9,7 @@ use Test::Dirs 0.03;
 
 use File::Find::Rule;
 use File::Path 'make_path';
+use File::Temp;
 
 use FindBin qw($Bin);
 use lib File::Spec->catfile($Bin, 'lib');

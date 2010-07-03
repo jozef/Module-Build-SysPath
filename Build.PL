@@ -21,6 +21,7 @@ my $builder = Module::Build->new(
         'Test::More'    => 0,
         'Test::Compile' => 0.08,
         'Test::Dirs'    => 0,
+        'File::Temp'    => 0,
     },
     add_to_cleanup      => [ 'Module-Build-SysPath-*' ],
     create_readme       => 1,
