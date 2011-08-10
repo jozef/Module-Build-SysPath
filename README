@@ -61,8 +61,9 @@ EXAMPLE
             docdir
             localedir
             webdir
+            srvdir
 
-    Files in:
+    Folders in:
 
         cachedir
         logdir

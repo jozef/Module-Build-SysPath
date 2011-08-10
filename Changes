@@ -1,5 +1,8 @@
 Revision history for Module-Build-SysPath
 
+0.15    16 May 2011
+    - add support for srvdir
+
 0.14    16 May 2011
     - Added testing using Test::Dirs
     - dist fixes

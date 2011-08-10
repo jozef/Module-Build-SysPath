@@ -25,6 +25,7 @@ sub _path_types {qw(
 	lockdir
 	sharedstatedir
 	webdir
+	srvdir
 )};
 
 sub prefix     { use Sys::Path; Sys::Path->find_distribution_root(__PACKAGE__); };
@@ -39,5 +40,6 @@ sub rundir     { File::Spec->catdir(__PACKAGE__->prefix, 'run') };
 sub lockdir    { File::Spec->catdir(__PACKAGE__->prefix, 'lock') };
 sub sharedstatedir { File::Spec->catdir(__PACKAGE__->prefix, 'state') };
 sub webdir     { File::Spec->catdir(__PACKAGE__->prefix, 'www') };
+sub srvdir     { File::Spec->catdir(__PACKAGE__->prefix, 'srv') };
 
 1;

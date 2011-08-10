@@ -27,6 +27,7 @@ sub _path_types {qw(
 	localedir
 	sharedstatedir
 	webdir
+	srvdir
 )};
 
 sub prefix        { File::Spec->catdir('/', 'usr') };
@@ -43,5 +44,6 @@ sub rundir     { File::Spec->catdir(__PACKAGE__->localstatedir, 'run') };
 sub lockdir    { File::Spec->catdir(__PACKAGE__->localstatedir, 'lock') };
 sub sharedstatedir { File::Spec->catdir(__PACKAGE__->localstatedir, 'lib') };
 sub webdir     { File::Spec->catdir(__PACKAGE__->localstatedir, 'www') };
+sub srvdir     { File::Spec->catdir('/', 'srv') };
 
 1;

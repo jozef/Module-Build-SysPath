@@ -23,7 +23,9 @@ examples/Sys-Path-Example1/t/pod-coverage.t
 examples/Sys-Path-Example1/t/pod.t
 lib/Module/Build/SysPath.pm
 MANIFEST			This list of files
+META.json
 META.yml
+MYMETA.json
 README
 t/00_compile.t
 t/01_Module-Build-SysPath.t
@@ -34,6 +36,7 @@ t/pod-coverage.t
 t/pod-spell.t
 t/pod.t
 t/tdirs/Acme-Test-SysPath.installed/etc/acme-test-syspath.cfg
+t/tdirs/Acme-Test-SysPath.installed/srv/srv.file
 t/tdirs/Acme-Test-SysPath.installed/usr/share/doc/doc
 t/tdirs/Acme-Test-SysPath.installed/usr/share/locale/locale
 t/tdirs/Acme-Test-SysPath.installed/usr/share/share
@@ -54,6 +57,7 @@ t/tdirs/Acme-Test-SysPath/META.yml
 t/tdirs/Acme-Test-SysPath/run/acme-run/.exists
 t/tdirs/Acme-Test-SysPath/share/share
 t/tdirs/Acme-Test-SysPath/spool/acme-spool/.exists
+t/tdirs/Acme-Test-SysPath/srv/srv.file
 t/tdirs/Acme-Test-SysPath/state/acme-state/.exists
 t/tdirs/Acme-Test-SysPath/www/.hidden/hidden
 t/tdirs/Acme-Test-SysPath/www/empty/.exists
