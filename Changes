@@ -1,5 +1,8 @@
 Revision history for Module-Build-SysPath
 
+0.16    21 Sep 2011
+    - fix build_requires
+
 0.15    16 May 2011
     - add support for srvdir
 
