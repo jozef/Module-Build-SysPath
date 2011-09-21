@@ -33,3 +33,4 @@
 ^MYMETA.yml$
 ^Module-Build-SysPath-
 
+^MYMETA\.json$

@@ -8,6 +8,9 @@ my $builder = Module::Build->new(
     license             => 'perl',
     dist_author         => 'Jozef Kutej <jkutej@cpan.org>',
     dist_version_from   => 'lib/Module/Build/SysPath.pm',
+    configure_requires => {
+        'Module::Build' => '0.3607',
+    },
     requires => {
         'Sys::Path'       => 0.11,
         'List::MoreUtils' => 0,

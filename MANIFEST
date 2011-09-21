@@ -25,7 +25,6 @@ lib/Module/Build/SysPath.pm
 MANIFEST			This list of files
 META.json
 META.yml
-MYMETA.json
 README
 t/00_compile.t
 t/01_Module-Build-SysPath.t
