@@ -29,7 +29,6 @@ my $builder = Module::Build->new(
     },
     add_to_cleanup      => [ 'Module-Build-SysPath-*' ],
     create_readme       => 1,
-    sign                => 1,
     meta_merge => {
         resources => {
             repository => 'git://github.com/jozef/Module-Build-SysPath.git',
