@@ -30,7 +30,7 @@ sub main {
     # workaround for a fresh checkout and distdir where empty folders are not copied
     if (not -e File::Spec->catdir($src1_inst, 'var', 'cache', 'acme-cache')) {
         diag 'creating missing empty folders';
-        foreach my $folder_type qw(cache lock log run spool) {
+        foreach my $folder_type (qw(cache lock log run spool)) {
             my $empty_folder = File::Spec->catdir($src1_inst, 'var', $folder_type, 'acme-'.$folder_type);
             diag(File::Spec->catfile($empty_folder));
             make_path($empty_folder);

@@ -3,7 +3,7 @@ package Module::Build::SysPath;
 use warnings;
 use strict;
 
-our $VERSION = '0.16';
+our $VERSION = '0.17';
 
 use base 'Module::Build';
 use Sys::Path 0.11;
@@ -403,6 +403,7 @@ order):
 
     Lars Dɪᴇᴄᴋᴏᴡ 迪拉斯
     Emmanuel Rodriguez
+    Slaven Rezić
 
 =head1 BUGS
 

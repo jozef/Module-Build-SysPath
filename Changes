@@ -1,5 +1,8 @@
 Revision history for Module-Build-SysPath
 
+0.17    20 Sep 2014
+    - qw now with () (required for new Perl versions) - thanks Slaven Rezić
+
 0.16    21 Sep 2011
     - fix build_requires
 
