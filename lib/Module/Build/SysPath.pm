@@ -3,7 +3,7 @@ package Module::Build::SysPath;
 use warnings;
 use strict;
 
-our $VERSION = '0.17';
+our $VERSION = '0.18';
 
 use base 'Module::Build';
 use Sys::Path 0.11;
@@ -43,8 +43,7 @@ sub new {
     my %spc_properties = (
         'path_types' => [ $module->_path_types ],
     );
-    my %rename_in_system;
-    my %conffiles_in_system;
+    my %configuration_files;
     my @writefiles_in_system;
     my @create_folders_in_system;
     foreach my $path_type ($module->_path_types) {
@@ -110,34 +109,8 @@ sub new {
                 # print 'bfile> ', $blib_file, "\n";
                 # print 'dfile> ', $dest_file, "\n\n";
                 
-                if (any { $_ eq $file } @conffiles) {
-                    $conffiles_in_system{$dest_file} = md5_hex(IO::Any->slurp([$file]));
-                    
-                    my $diff;
-                    $diff = diff($file, $dest_file, { STYLE => 'Unified' })
-                        if -f $dest_file;
-                    if (
-                        $diff                                                   # prompt when files differ
-                        and Sys::Path->changed_since_install($dest_file)        # and only if the file changed on filesystem
-                    ) {
-                        # prompt if to overwrite conf or not
-                        if (
-                            # only if the distribution conffile changed since last install
-                            Sys::Path->changed_since_install($dest_file, $file)
-                            and Sys::Path->prompt_cfg_file_changed(
-                                $file,
-                                $dest_file,
-                                sub { $builder->prompt(@_) },
-                            )
-                        ) {
-                            $rename_in_system{$dest_file} = $dest_file.'-old';
-                        }
-                        else {
-                            $blib_file .= '-spc';
-                            $dest_file .= '-spc';
-                        }
-                    }
-                }
+                $configuration_files{$dest_file} = $blib_file
+                    if any { $_ eq $file } @conffiles;
 
                 # add file the the Build.PL _files list
                 $files{$file} = $blib_file;
@@ -156,8 +129,7 @@ sub new {
         $builder->add_build_element($path_type);
     }
     $builder->{'properties'}->{'spc'} = \%spc_properties;
-    $builder->notes('rename_in_system'     => \%rename_in_system);
-    $builder->notes('conffiles_in_system'  => \%conffiles_in_system);
+    $builder->notes('configuration_files' => \%configuration_files);
     $builder->notes('writefiles_in_system' => \@writefiles_in_system);
     $builder->notes('create_folders_in_system' => \@create_folders_in_system);
     
@@ -168,15 +140,38 @@ sub ACTION_install {
     my $builder = shift;
     my $destdir = $builder->{'properties'}->{'destdir'};
 
-    # move system file for backup (only when really installing to system)
+    # Build before deciding so comparisons and checksums use the installed bytes.
+    $builder->depends_on('build');
+    my %conffiles_in_system;
+    my %alternate_files;
+    my @writefiles_in_system = @{$builder->notes('writefiles_in_system')};
     if (not $destdir) {
-        my %rename_in_system = %{$builder->notes('rename_in_system')};
-        while (my ($system_file, $new_system_file) = each %rename_in_system) {
-            print 'Moving ', $system_file,' -> ', $new_system_file, "\n";
-            rename($system_file, $new_system_file) or die $!;
+        my %configuration_files = %{$builder->notes('configuration_files')};
+        while (my ($dest_file, $blib_file) = each %configuration_files) {
+            my $file = File::Spec->catfile($builder->blib, $blib_file);
+            $conffiles_in_system{$dest_file} = md5_hex(IO::Any->slurp([$file]));
+            next unless -f $dest_file
+                and diff($file, $dest_file, { STYLE => 'Unified' })
+                and Sys::Path->changed_since_install($dest_file);
+
+            if (
+                Sys::Path->changed_since_install($dest_file, $file)
+                and Sys::Path->prompt_cfg_file_changed(
+                    $file, $dest_file, sub { $builder->prompt(@_) },
+                )
+            ) {
+                print 'Moving ', $dest_file, ' -> ', $dest_file.'-old', "\n";
+                rename($dest_file, $dest_file.'-old') or die $!;
+            }
+            else {
+                $alternate_files{$file} = $file.'-spc';
+                @writefiles_in_system = map {
+                    $_ eq $dest_file ? $_.'-spc' : $_
+                } @writefiles_in_system;
+            }
         }
     }
-    
+
     # create requested folders
     foreach my $folder (@{$builder->notes('create_folders_in_system')}) {
         $folder = File::Spec->catdir($destdir || (), $folder);
@@ -186,7 +181,21 @@ sub ACTION_install {
         }
     }
 
-    $builder->SUPER::ACTION_install(@_);
+    # Restore ordinary build filenames even when the parent installer fails.
+    my @renamed_files;
+    my $installed = eval {
+        while (my ($file, $alternate) = each %alternate_files) {
+            rename($file, $alternate) or die $!;
+            push @renamed_files, $file;
+        }
+        $builder->SUPER::ACTION_install(@_);
+        1;
+    };
+    my $install_error = $@;
+    foreach my $file (@renamed_files) {
+        rename($alternate_files{$file}, $file) or die $!;
+    }
+    die $install_error unless $installed;
 
     my $module  = $builder->module_name;
 
@@ -235,12 +244,12 @@ sub ACTION_install {
         
     # see https://rt.cpan.org/Ticket/Display.html?id=49579
     # ExtUtils::Install is forcing 0444 so we have to hack write permition after install :-/
-    foreach my $writefile (@{$builder->notes('writefiles_in_system')}) {
+    foreach my $writefile (@writefiles_in_system) {
         chmod 0644, File::Spec->catfile($destdir || (), $writefile) or die $!;
     }
     
     # record md5sum of new distribution conffiles (only when really installing to system)
-    Sys::Path->install_checksums(%{$builder->notes('conffiles_in_system')})
+    Sys::Path->install_checksums(%conffiles_in_system)
         if (not $destdir);
     
     return;

@@ -1,5 +1,8 @@
 Revision history for Module-Build-SysPath
 
+0.18    08 Sep 2026
+    - Check configuration files at install time to preserve local changes made after Build.PL.
+
 0.17    20 Sep 2014
     - qw now with () (required for new Perl versions) - thanks Slaven Rezić
 
