@@ -117,19 +117,41 @@ PERL
         };
         my $source = File::Spec->catfile($dist, 'conf', 'acme-test-syspath.cfg');
         my $config = File::Spec->catfile($system, 'sysconfdir', 'acme-test-syspath.cfg');
+        my $explicit_source = File::Spec->catfile($dist, 'share', 'share');
+        my $explicit_config = File::Spec->catfile($system, 'datadir', 'share');
         my $original = IO::Any->slurp([$source]);
+        my $explicit_original = IO::Any->slurp([$explicit_source]);
         $run->('', 'Build.PL', '--install_base='.$system.'/perl');
         $run->('', 'Build', 'install');
-        is(IO::Any->slurp([$config]), $original, 'initial configuration installed');
+        is(IO::Any->slurp([$config]), $original,
+            'initial implicit sysconfdir configuration installed');
+        is(IO::Any->slurp([$explicit_config]), $explicit_original,
+            'initial explicit non-sysconfdir configuration installed');
+        my $checksums = JSON::Util->decode([
+            "$system", 'sharedstatedir', 'syspath', 'install-checksums.json',
+        ]);
+        is($checksums->{$config}, Digest::MD5::md5_hex($original),
+            'implicit sysconfdir configuration checksum recorded');
+        is($checksums->{$explicit_config}, Digest::MD5::md5_hex($explicit_original),
+            'explicit non-sysconfdir configuration checksum recorded');
 
         $run->('', 'Build.PL', '--install_base='.$system.'/perl');
         IO::Any->spew([$config], "local changes after Build.PL\n");
+        chmod 0644, $explicit_config or die $!;
+        IO::Any->spew([$explicit_config], "local explicit changes after Build.PL\n");
         my $output = $run->('', 'Build', 'install');
         is(IO::Any->slurp([$config]), "local changes after Build.PL\n",
-            'local changes made after configuration survive install');
-        ok(-f $config.'-spc', 'distribution configuration installed as -spc');
+            'local changes to implicit configuration survive install');
+        ok(-f $config.'-spc', 'implicit distribution configuration installed as -spc');
         is(IO::Any->slurp([$config.'-spc']), $original, '-spc contains distribution bytes')
             if -f $config.'-spc';
+        is(IO::Any->slurp([$explicit_config]), "local explicit changes after Build.PL\n",
+            'local changes to explicit non-sysconfdir configuration survive install');
+        ok(-f $explicit_config.'-spc',
+            'explicit non-sysconfdir distribution configuration installed as -spc');
+        is(IO::Any->slurp([$explicit_config.'-spc']), $explicit_original,
+            'explicit non-sysconfdir -spc contains distribution bytes')
+            if -f $explicit_config.'-spc';
         unlike($output, qr/What would you like to do/, 'unchanged distribution does not prompt');
 
         $run->('', 'Build', 'install');

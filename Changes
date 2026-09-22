@@ -4,6 +4,8 @@ Revision history for Module-Build-SysPath
     - Check configuration files at install time to preserve local changes made after Build.PL.
     - Restore active configuration files when installation fails and preserve
       existing -old backups.
+    - Protect every sysconfdir payload file as configuration, even when it is
+      not explicitly listed in conffiles.
 
 0.17    20 Sep 2014
     - qw now with () (required for new Perl versions) - thanks Slaven Rezić

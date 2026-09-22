@@ -110,7 +110,11 @@ sub new {
                 # print 'dfile> ', $dest_file, "\n\n";
                 
                 $configuration_files{$dest_file} = $blib_file
-                    if any { $_ eq $file } @conffiles;
+                    if basename($file) ne '.exists'
+                    and (
+                        $path_type eq 'sysconfdir'
+                        or any { $_ eq $file } @conffiles
+                    );
 
                 # add file the the Build.PL _files list
                 $files{$file} = $blib_file;
