@@ -16,6 +16,7 @@ use File::Basename 'basename', 'dirname';
 use File::Path 'make_path';
 use File::Temp 'tempfile';
 use Path::Tiny 'path';
+use B 'perlstring';
 
 our $sys_path_config_name = 'SPc';
 
@@ -43,6 +44,43 @@ sub _spc_rename {
     return;
 }
 
+sub _rewrite_spc_accessors {
+    my ($content, $path_types, $paths) = @_;
+
+    foreach my $path_type (split(m/\|/, $path_types)) {
+        die "invalid SPc path type '$path_type'"
+            if $path_type !~ m/\A[A-Za-z_]\w*\z/;
+
+        my $header = qr/^[ \t]*sub[ \t]+\Q$path_type\E\b/m;
+        my $header_count = () = $content =~ m/$header/g;
+        die "missing SPc accessor '$path_type'\n" if not $header_count;
+        die "duplicate SPc accessor '$path_type'\n" if $header_count > 1;
+
+        my $definition = qr{
+            ^[ \t]*          # Allow indentation at the start of the line.
+            sub [ \t]+       # Require a named subroutine declaration.
+            \Q$path_type\E   # Match only the requested accessor name.
+            \s*              # Allow the opening brace on a later line.
+            \{               # Start the accessor body.
+            [^{}]*           # Reject bodies containing nested blocks.
+            \}               # End the accessor body.
+            [ \t]*           # Allow whitespace before the terminator.
+            ;?               # Accept an optional statement terminator.
+            [ \t]*           # Allow trailing horizontal whitespace.
+            (?: \r?\n | \z ) # Consume the line ending or end of source.
+        }xm;
+        my $definition_count = () = $content =~ m/$definition/g;
+        die "unsupported SPc accessor '$path_type'\n"
+            if $definition_count != 1;
+
+        my $literal = perlstring(path($paths->{$path_type})->stringify);
+        my $replacement = "sub $path_type { $literal };\n";
+        $content =~ s/$definition/$replacement/;
+    }
+
+    return $content;
+}
+
 sub _rewrite_installed_spc {
     my ($builder, $source, $destination, $path_types) = @_;
     my $mode = (stat($destination))[2];
@@ -50,24 +88,28 @@ sub _rewrite_installed_spc {
     $mode &= oct('7777');
 
     my ($source_fh, $temporary_fh, $temporary);
-    my $rewritten = eval {
-        ($temporary_fh, $temporary) = tempfile(
-            '.SPc.pm.XXXXXX', DIR => dirname($destination), UNLINK => 0,
-        );
+    my $rewrite_succeeded = eval {
         $source_fh = $builder->_spc_open_source($source);
+        my $content = '';
         local $! = 0;
         while (defined(my $line = <$source_fh>)) {
             next if $line =~ m/# remove after install$/;
-            if ($line =~ m/^sub \s+ ($path_types) \s* {/xms) {
-                $line = 'sub '.$1." {'"
-                    .$builder->{'properties'}->{'spc'}->{'path'}->{$1}
-                    ."'};\n";
-            }
-            $builder->_spc_write($temporary_fh, $line);
+            $content .= $line;
         }
         die "cannot read '$source': $!" if $!;
         $builder->_spc_close($source_fh, 'source');
         undef $source_fh;
+
+        $content = _rewrite_spc_accessors(
+            $content,
+            $path_types,
+            $builder->{'properties'}->{'spc'}->{'path'},
+        );
+
+        ($temporary_fh, $temporary) = tempfile(
+            '.SPc.pm.XXXXXX', DIR => dirname($destination), UNLINK => 0,
+        );
+        $builder->_spc_write($temporary_fh, $content);
         chmod($mode, $temporary)
             or die "cannot chmod '$temporary': $!";
         $builder->_spc_close($temporary_fh, 'destination');
@@ -77,7 +119,7 @@ sub _rewrite_installed_spc {
         1;
     };
     my $rewrite_error = $@;
-    if (not $rewritten) {
+    if (not $rewrite_succeeded) {
         eval { close($source_fh) } if $source_fh;
         eval { close($temporary_fh) } if $temporary_fh;
         unlink($temporary) if defined $temporary and -e $temporary;

@@ -10,6 +10,9 @@ Revision history for Module-Build-SysPath
       checksums if rewriting fails.
     - Handle source and destination paths literally, including paths containing
       regular-expression metacharacters and spaces.
+    - Serialize installed SPc paths as Perl literals, including Unicode and
+      interpolation characters; support multiline and indented simple
+      accessors, and reject unsupported accessor definitions atomically.
 
 0.17    20 Sep 2014
     - qw now with () (required for new Perl versions) - thanks Slaven Rezić

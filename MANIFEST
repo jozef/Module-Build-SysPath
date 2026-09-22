@@ -29,6 +29,7 @@ README
 t/00_compile.t
 t/01_Module-Build-SysPath.t
 t/02_path-handling.t
+t/03-spc-rewrite.t
 t/distribution.t
 t/fixme.t
 t/lib/Sys/Path/SPc.pm
