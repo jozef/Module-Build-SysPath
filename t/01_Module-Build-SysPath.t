@@ -11,7 +11,7 @@ use Capture::Tiny 'capture_merged';
 use Cwd 'getcwd';
 use File::Copy::Recursive 'dircopy';
 use File::Find::Rule;
-use File::Path 'make_path';
+use Path::Tiny 'path';
 use File::Temp;
 
 use FindBin qw($Bin);
@@ -39,14 +39,14 @@ sub main {
         if (not -e File::Spec->catdir($src1_inst, 'var', 'cache', 'acme-cache')) {
             diag('creating missing empty folders');
             foreach my $folder_type (qw(cache lock log run spool)) {
-                my $empty_folder = File::Spec->catdir(
+                my $empty_folder = path(
                     $src1_inst, 'var', $folder_type, 'acme-'.$folder_type,
                 );
-                diag(File::Spec->catfile($empty_folder));
-                make_path($empty_folder);
+                diag($empty_folder->child($empty_folder));
+                $empty_folder->mkdir;
             }
-            make_path(File::Spec->catdir($src1_inst, 'var', 'lib', 'acme-state'));
-            make_path(File::Spec->catdir($src1_inst, 'var', 'www', 'empty'));
+            path($src1_inst, 'var', 'lib', 'acme-state')->mkdir;
+            path($src1_inst, 'var', 'www', 'empty')->mkdir;
         }
 
         my @inc = map { '-I'.$_ } @INC;
@@ -106,7 +106,7 @@ sub main {
         local $ENV{PERL_MM_USE_DEFAULT} = 1;
         my $dist = temp_copy_ok($src1, 'copy configuration test distribution');
         my $system = File::Temp->newdir();
-        make_path(File::Spec->catdir($system, 'sharedstatedir', 'syspath'));
+        path($system, 'sharedstatedir', 'syspath')->mkdir;
         local $ENV{SYSPATH_TEST_ROOT} = "$system";
         IO::Any->spew([''.$dist, 'TestPaths.pm'], <<'PERL');
 use Sys::Path::SPc;

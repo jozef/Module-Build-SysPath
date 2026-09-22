@@ -1,6 +1,6 @@
 Revision history for Module-Build-SysPath
 
-0.18
+0.18    22 September 2026
     - Check configuration files at install time to preserve local changes made after Build.PL.
     - Restore active configuration files when installation fails and preserve
       existing -old backups.

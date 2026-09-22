@@ -12,8 +12,6 @@ use FindBin '$Bin';
 use Digest::MD5 qw(md5_hex);
 use Text::Diff 'diff';
 use File::Spec;
-use File::Basename 'basename', 'dirname';
-use File::Path 'make_path';
 use File::Temp 'tempfile';
 use Path::Tiny 'path';
 use B 'perlstring';
@@ -107,7 +105,7 @@ sub _rewrite_installed_spc {
         );
 
         ($temporary_fh, $temporary) = tempfile(
-            '.SPc.pm.XXXXXX', DIR => dirname($destination), UNLINK => 0,
+            '.SPc.pm.XXXXXX', DIR => path($destination)->parent, UNLINK => 0,
         );
         $builder->_spc_write($temporary_fh, $content);
         chmod($mode, $temporary)
@@ -202,8 +200,8 @@ sub new {
                 $file = "$distribution_file";
                 
                 # allow empty directories to be created
-                push @create_folders_in_system, dirname($dest_file)
-                    if (basename($file) eq '.exists');
+                push @create_folders_in_system, path($dest_file)->parent
+                    if (path($file)->basename eq '.exists');
                 
                 # skip non-persistant folders, only include explicitely wanted and .exists files
                 next if
@@ -228,7 +226,7 @@ sub new {
                 # print 'dfile> ', $dest_file, "\n\n";
                 
                 $configuration_files{$dest_file} = $blib_file
-                    if basename($file) ne '.exists'
+                    if (path($file)->basename ne '.exists')
                     and (
                         $path_type eq 'sysconfdir'
                         or any { $_ eq $file } @conffiles
@@ -299,7 +297,7 @@ sub ACTION_install {
         $folder = File::Spec->catdir($destdir || (), $folder);
         if (not -d $folder) {
             print 'Creating '.$folder.' folder', "\n";
-            make_path($folder);
+            path($folder)->mkdir;
         }
     }
 

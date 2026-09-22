@@ -12,13 +12,11 @@ my $builder = Module::Build->new(
         'Module::Build' => '0.3607',
     },
     requires => {
-        'Sys::Path'       => 0.11,
+        'Sys::Path'       => 0.17,
         'List::MoreUtils' => 0,
         'Digest::MD5'     => 0,
         'Text::Diff'      => 0,
         'File::Spec'      => 0,
-        'File::Basename'  => 0,
-        'File::Path'      => 2.07,    # Introduce make_path() and rm_tree() API extension.
         'File::Temp'      => 0,
         'Path::Tiny'      => 0.101,
     },
