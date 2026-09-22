@@ -1,6 +1,6 @@
 Revision history for Module-Build-SysPath
 
-0.18    22 September 2026
+0.19    22 September 2026
     - Check configuration files at install time to preserve local changes made after Build.PL.
     - Restore active configuration files when installation fails and preserve
       existing -old backups.
@@ -13,6 +13,9 @@ Revision history for Module-Build-SysPath
     - Serialize installed SPc paths as Perl literals, including Unicode and
       interpolation characters; support multiline and indented simple
       accessors, and reject unsupported accessor definitions atomically.
+
+0.18    13 October 2017
+    - author tests moved to xt/
 
 0.17    20 Sep 2014
     - qw now with () (required for new Perl versions) - thanks Slaven Rezić

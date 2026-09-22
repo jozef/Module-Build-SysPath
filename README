@@ -128,7 +128,7 @@ EXAMPLE
     stores the checksums of "conffile"s.
 
 AUTHOR
-    Jozef Kutej, "<jkutej at cpan.org>"
+    Jozef Kutej, <jkutej@cpan.org>
 
 CONTRIBUTORS
     The following people have contributed to the Sys::Path by commiting
@@ -139,40 +139,6 @@ CONTRIBUTORS
         Lars Dɪᴇᴄᴋᴏᴡ 迪拉斯
         Emmanuel Rodriguez
         Slaven Rezić
-
-BUGS
-    Please report any bugs or feature requests to "bug-module-build-syspath
-    at rt.cpan.org", or through the web interface at
-    <http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Module-Build-SysPath>. I
-    will be notified, and then you'll automatically be notified of progress
-    on your bug as I make changes.
-
-SUPPORT
-  Mailing list
-    <http://lists.meon.sk/mailman/listinfo/sys-path>
-
-  The rest
-    You can find documentation for this module with the perldoc command.
-
-        perldoc Sys::Path
-
-    You can also look for information at:
-
-    *   RT: CPAN's request tracker
-
-        <http://rt.cpan.org/NoAuth/Bugs.html?Dist=Module-Build-SysPath>
-
-    *   AnnoCPAN: Annotated CPAN documentation
-
-        <http://annocpan.org/dist/Module-Build-SysPath>
-
-    *   CPAN Ratings
-
-        <http://cpanratings.perl.org/d/Module-Build-SysPath>
-
-    *   Search CPAN
-
-        <http://search.cpan.org/dist/Module-Build-SysPath>
 
 COPYRIGHT & LICENSE
     Copyright 2009 Jozef Kutej, all rights reserved.
