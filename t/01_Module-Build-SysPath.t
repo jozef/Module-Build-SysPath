@@ -4,9 +4,12 @@ use strict;
 use warnings;
 
 #use Test::More 'no_plan';
-use Test::More tests => 8;
+use Test::More tests => 3;
 use Test::Dirs 0.03;
 
+use Capture::Tiny 'capture_merged';
+use Cwd 'getcwd';
+use File::Copy::Recursive 'dircopy';
 use File::Find::Rule;
 use File::Path 'make_path';
 use File::Temp;
@@ -24,43 +27,80 @@ exit main();
 sub main {
     my $src1      = File::Spec->catdir($Bin, 'tdirs', 'Acme-Test-SysPath');
     my $src1_inst = File::Spec->catdir($Bin, 'tdirs', 'Acme-Test-SysPath.installed');
-    my $tmp_dir   = temp_copy_ok($src1, 'copy Acme::Test::SysPath to tmp folder');
-    my $dest_dir  = File::Temp->newdir();
-    
-    # workaround for a fresh checkout and distdir where empty folders are not copied
-    if (not -e File::Spec->catdir($src1_inst, 'var', 'cache', 'acme-cache')) {
-        diag 'creating missing empty folders';
-        foreach my $folder_type (qw(cache lock log run spool)) {
-            my $empty_folder = File::Spec->catdir($src1_inst, 'var', $folder_type, 'acme-'.$folder_type);
-            diag(File::Spec->catfile($empty_folder));
-            make_path($empty_folder);
+    subtest 'distribution installs system paths and payload files' => sub {
+        my $tmp_root = File::Temp->newdir();
+        my $tmp_dir = File::Spec->catdir($tmp_root, 'copied distribution');
+        ok(dircopy($src1, $tmp_dir), 'copy Acme::Test::SysPath to tmp folder');
+        my $dest_dir = File::Temp->newdir(
+            'installed distribution XXXXXXXX', TMPDIR => 1,
+        );
+
+        # Work around empty folders omitted from fresh checkouts and distdirs.
+        if (not -e File::Spec->catdir($src1_inst, 'var', 'cache', 'acme-cache')) {
+            diag('creating missing empty folders');
+            foreach my $folder_type (qw(cache lock log run spool)) {
+                my $empty_folder = File::Spec->catdir(
+                    $src1_inst, 'var', $folder_type, 'acme-'.$folder_type,
+                );
+                diag(File::Spec->catfile($empty_folder));
+                make_path($empty_folder);
+            }
+            make_path(File::Spec->catdir($src1_inst, 'var', 'lib', 'acme-state'));
+            make_path(File::Spec->catdir($src1_inst, 'var', 'www', 'empty'));
         }
-        make_path(File::Spec->catdir($src1_inst, 'var', 'lib', 'acme-state'));
-        make_path(File::Spec->catdir($src1_inst, 'var', 'www', 'empty'));
-    }
-    
-    my $inc       = join(' ', map { '-I'.$_ } @INC);
-    my $build_out = `cd $tmp_dir && $^X $inc Build.PL --destdir=$dest_dir 2>&1`;
-    like($build_out, qr/Acme-Test-SysPath/, 'Build.PL output');
-    
-    my $install_out = `cd $tmp_dir && $^X Build install`;
-    note $install_out;
-    
-    my ($packlist) = File::Find::Rule->file->name('.packlist')->in($dest_dir);
-    dir_cleanup_ok($packlist, 'cleanup auto/');
-    
-    SKIP: {
-        my ($man_folder) = File::Find::Rule->directory->name('man')->in($dest_dir);
-        skip 'no man on this os'
-            if not $man_folder;
-        
-        dir_cleanup_ok($man_folder, 'cleanup man');
+
+        my @inc = map { '-I'.$_ } @INC;
+        my $run = sub {
+            my (@args) = @_;
+            my $original_directory = getcwd();
+            my $status;
+            my $output = capture_merged {
+                chdir($tmp_dir) or die $!;
+                system($^X, @args);
+                $status = $?;
+                chdir($original_directory) or die $!;
+            };
+            is($status, 0, join(' ', @args).' succeeds') or diag($output);
+            return $output;
+        };
+
+        my $build_out = $run->(@inc, 'Build.PL', '--destdir='.$dest_dir);
+        like($build_out, qr/Acme-Test-SysPath/, 'Build.PL output');
+
+        my @injection = $ENV{SYSPATH_TEST_FAIL_ORIGINAL_INSTALL}
+            ? ('-I'.File::Spec->catdir($Bin, 'lib'), '-MPostCopyFailure')
+            : ();
+        $run->(@injection, 'Build', 'install');
+
+        my ($packlist) = File::Find::Rule->file->name('.packlist')->in($dest_dir);
+        dir_cleanup_ok($packlist, 'cleanup auto/');
+
+        SKIP: {
+            my ($man_folder) = File::Find::Rule->directory->name('man')->in($dest_dir);
+            skip('no man on this os') if not $man_folder;
+            dir_cleanup_ok($man_folder, 'cleanup man');
+        }
+
+        my ($installed_spc) = File::Find::Rule->file->name('SPc.pm')->in($dest_dir);
+        ok($installed_spc, 'installed SPc module exists');
+        my $loaded;
+        $loaded = do $installed_spc if $installed_spc;
+        ok($loaded, 'installed SPc module loads') or diag($@ || $!);
+        if ($loaded) {
+            foreach my $path_type (Acme::Test::SysPath::SPc->_path_types) {
+                is(
+                    Acme::Test::SysPath::SPc->$path_type,
+                    Sys::Path->$path_type,
+                    "$path_type accessor uses the system path",
+                );
+            }
+        }
+        my ($pm_folder) = File::Find::Rule->file->name('SysPath.pm')->in($dest_dir);
+        dir_cleanup_ok($pm_folder, 'cleanup SysPath.pm');
+
+        is_dir($dest_dir, $src1_inst, 'Acme::Test::SysPath install folders');
+        done_testing();
     };
-    
-    my ($pm_folder) = File::Find::Rule->file->name('SysPath.pm')->in($dest_dir);
-    dir_cleanup_ok($pm_folder, 'cleanup SysPath.pm');
-    
-    is_dir($dest_dir, $src1_inst, 'Acme::Test::SysPath install folders');
 
     subtest 'configuration decisions use install-time contents' => sub {
         local $ENV{PERL_MM_USE_DEFAULT} = 1;

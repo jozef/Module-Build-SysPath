@@ -23,6 +23,7 @@ my $builder = Module::Build->new(
         'Path::Tiny'      => 0.101,
     },
     build_requires => {
+        'Capture::Tiny' => 0,
         'Test::More'    => 0,
         'Test::Compile' => 0.08,
         'Test::Dirs'    => 0,

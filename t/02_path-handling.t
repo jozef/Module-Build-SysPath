@@ -4,6 +4,8 @@ use strict;
 use warnings;
 
 use Test::More;
+use Capture::Tiny 'capture_merged';
+use Cwd 'getcwd';
 use File::Copy::Recursive 'dircopy';
 use FindBin '$Bin';
 use Path::Tiny 'path';
@@ -25,23 +27,18 @@ $hidden->parent->mkpath;
 $hidden->spew("hidden payload\n");
 
 my @inc = map { '-I'.path($_)->absolute } @INC;
-my $exec_child = sub {
-    my (@args) = @_;
-    chdir $distribution or die $!;
-    open(STDERR, '>&', STDOUT) or die $!;
-    exec $^X, @inc, @args;
-    die "exec: $!";
-};
 my $run = sub {
     my (@args) = @_;
-    my $pid = open(my $output, '-|');
-    die $! if not defined $pid;
-    $exec_child->(@args) if not $pid;
-    local $/;
-    my $result = <$output>;
-    close($output);
-    is($?, 0, join(' ', @args).' succeeds') or diag $result;
-    return $result;
+    my $original_directory = getcwd();
+    my $status;
+    my $output = capture_merged {
+        chdir($distribution) or die $!;
+        system($^X, @inc, @args);
+        $status = $?;
+        chdir($original_directory) or die $!;
+    };
+    is($status, 0, join(' ', @inc, @args).' succeeds') or diag($output);
+    return $output;
 };
 
 $run->('Build.PL', '--destdir='.$destination);

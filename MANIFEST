@@ -30,8 +30,10 @@ t/00_compile.t
 t/01_Module-Build-SysPath.t
 t/02_path-handling.t
 t/03-spc-rewrite.t
+t/04-install-failure-detection.t
 t/distribution.t
 t/fixme.t
+t/lib/PostCopyFailure.pm
 t/lib/Sys/Path/SPc.pm
 t/pod-coverage.t
 t/pod-spell.t
