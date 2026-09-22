@@ -8,6 +8,8 @@ Revision history for Module-Build-SysPath
       not explicitly listed in conffiles.
     - Replace installed SPc modules atomically and abort before recording
       checksums if rewriting fails.
+    - Handle source and destination paths literally, including paths containing
+      regular-expression metacharacters and spaces.
 
 0.17    20 Sep 2014
     - qw now with () (required for new Perl versions) - thanks Slaven Rezić

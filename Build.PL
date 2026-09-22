@@ -20,11 +20,13 @@ my $builder = Module::Build->new(
         'File::Basename'  => 0,
         'File::Path'      => 2.07,    # Introduce make_path() and rm_tree() API extension.
         'File::Temp'      => 0,
+        'Path::Tiny'      => 0.101,
     },
     build_requires => {
         'Test::More'    => 0,
         'Test::Compile' => 0.08,
         'Test::Dirs'    => 0,
+        'File::Copy::Recursive' => 0,
         'File::Find::Rule' => 0,
         'Monkey::Patch::Action' => 0,
     },

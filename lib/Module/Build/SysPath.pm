@@ -15,6 +15,7 @@ use File::Spec;
 use File::Basename 'basename', 'dirname';
 use File::Path 'make_path';
 use File::Temp 'tempfile';
+use Path::Tiny 'path';
 
 our $sys_path_config_name = 'SPc';
 
@@ -99,12 +100,14 @@ sub new {
         eval "use $module"; die $@ if $@;
     };
     
-    my $distribution_root = Sys::Path->find_distribution_root($builder->module_name);
+    my $distribution_root = path(
+        Sys::Path->find_distribution_root($builder->module_name)
+    )->absolute;
     print 'dist root is ', $distribution_root, "\n";
     
     # map conf files to array of real paths
     my @conffiles = (
-        map { ref $_ eq 'ARRAY' ? File::Spec->catfile(@{$_}) : $_ }     # convert path array to file name strings
+        map { ref $_ eq 'ARRAY' ? path(@{$_}) : path($_) }              # convert path arrays to normalized file names
         @{$builder->{'properties'}->{'conffiles'} || []}                # all conffiles
     );
     
@@ -115,8 +118,8 @@ sub new {
     my @writefiles_in_system;
     my @create_folders_in_system;
     foreach my $path_type ($module->_path_types) {
-        my $sys_path     = $module->$path_type;
-        my $install_path = Sys::Path->$path_type;
+        my $sys_path     = path($module->$path_type)->absolute;
+        my $install_path = path(Sys::Path->$path_type)->absolute;
         
         $builder->{'properties'}->{$path_type.'_files'} ||= {};
 
@@ -133,23 +136,28 @@ sub new {
             my %files;
             my @ignore_folders;
             foreach my $file (@{$builder->rscan_dir($sys_path)}) {
+                my $source_path = path($file)->absolute;
+                die "'$source_path' is outside distribution root '$distribution_root'"
+                    if not $distribution_root->subsumes($source_path);
+                die "'$source_path' is outside path-type root '$sys_path'"
+                    if not $sys_path->subsumes($source_path);
+
+                my $distribution_file = $source_path->relative($distribution_root);
+
                 # skip folders, but remember folders with . prefix
                 if (-d $file) {
-                    $file =~ s/$distribution_root.//;
-
                     # ignore folders with . prefix
-                    push @ignore_folders, File::Spec->catfile($file, '')    # File::Spec with empty string to add portable trailing slash
-                        if (basename($file) =~ m{^\.} and (not exists $builder->{'properties'}->{$path_type.'_files'}->{$file}));
+                    push @ignore_folders, $source_path
+                        if substr($source_path->basename, 0, 1) eq '.'
+                        and not exists $builder->{'properties'}->{$path_type.'_files'}->{"$distribution_file"};
 
                     next;
                 }
-                
-                my $blib_file = $file;
-                my $dest_file = $file;
-                $file         =~ s/$distribution_root.//;
-                $dest_file    =~ s/^$sys_path/$install_path/;
-                $blib_file    =~ s/^$sys_path.//;
-                $blib_file    = File::Spec->catfile($path_type, $blib_file);
+
+                my $path_file = $source_path->relative($sys_path);
+                my $dest_file = $install_path->child($path_file);
+                my $blib_file = path($path_type)->child($path_file);
+                $file = "$distribution_file";
                 
                 # allow empty directories to be created
                 push @create_folders_in_system, dirname($dest_file)
@@ -163,14 +171,14 @@ sub new {
                 
                 # skip files from .folders, only include explicitely wanted
                 next if any {
-                    ($file =~ m/^$_/)
+                    $_->subsumes($source_path)
                     and (not exists $builder->{'properties'}->{$path_type.'_files'}->{$file})
                 } @ignore_folders;
                 
                 # skip files with . prefix
                 next if
-                    (basename($file) =~ m/^\./)
-                    and (basename($file) ne '.exists')
+                    (substr($source_path->basename, 0, 1) eq '.')
+                    and ($source_path->basename ne '.exists')
                 ;
                 
                 # print 'file>  ', $file, "\n";
