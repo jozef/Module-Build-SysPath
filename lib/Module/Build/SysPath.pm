@@ -143,6 +143,7 @@ sub ACTION_install {
     # Build before deciding so comparisons and checksums use the installed bytes.
     $builder->depends_on('build');
     my %conffiles_in_system;
+    my %backup_files;
     my %alternate_files;
     my @writefiles_in_system = @{$builder->notes('writefiles_in_system')};
     if (not $destdir) {
@@ -160,8 +161,7 @@ sub ACTION_install {
                     $file, $dest_file, sub { $builder->prompt(@_) },
                 )
             ) {
-                print 'Moving ', $dest_file, ' -> ', $dest_file.'-old', "\n";
-                rename($dest_file, $dest_file.'-old') or die $!;
+                $backup_files{$dest_file} = $dest_file.'-old';
             }
             else {
                 $alternate_files{$file} = $file.'-spc';
@@ -183,7 +183,17 @@ sub ACTION_install {
 
     # Restore ordinary build filenames even when the parent installer fails.
     my @renamed_files;
+    my @backed_up_files;
     my $installed = eval {
+        foreach my $backup (values %backup_files) {
+            die "configuration backup '$backup' already exists\n"
+                if -e $backup;
+        }
+        while (my ($file, $backup) = each %backup_files) {
+            print 'Moving ', $file, ' -> ', $backup, "\n";
+            rename($file, $backup) or die $!;
+            push @backed_up_files, $file;
+        }
         while (my ($file, $alternate) = each %alternate_files) {
             rename($file, $alternate) or die $!;
             push @renamed_files, $file;
@@ -192,10 +202,23 @@ sub ACTION_install {
         1;
     };
     my $install_error = $@;
+    my @recovery_errors;
     foreach my $file (@renamed_files) {
-        rename($alternate_files{$file}, $file) or die $!;
+        rename($alternate_files{$file}, $file)
+            or push @recovery_errors, "cannot restore '$file': $!";
     }
-    die $install_error unless $installed;
+    if (not $installed) {
+        foreach my $file (reverse @backed_up_files) {
+            if (-e $file and not unlink($file)) {
+                push @recovery_errors, "cannot remove partial '$file': $!";
+                next;
+            }
+            rename($backup_files{$file}, $file)
+                or push @recovery_errors, "cannot restore '$file': $!";
+        }
+        die join("\n", $install_error, @recovery_errors);
+    }
+    die join("\n", @recovery_errors) if @recovery_errors;
 
     my $module  = $builder->module_name;
 
@@ -389,7 +412,10 @@ be prompted what to do:
 
 If N or O is selected distribution files is installed with F<-spc>
 suffix. If Y or I is selected the system C<conffile> is renamed by adding
-suffix F<-old> and distribution C<conffile> is installed.
+suffix F<-old> and distribution C<conffile> is installed. Installation aborts
+without changing either file if the F<-old> backup already exists. If the
+parent installation fails after the rename, the original C<conffile> is
+restored.
 
 =back
 

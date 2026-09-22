@@ -118,6 +118,9 @@ EXAMPLE
         If N or O is selected distribution files is installed with -spc
         suffix. If Y or I is selected the system "conffile" is renamed by
         adding suffix -old and distribution "conffile" is installed.
+        Installation aborts without changing either file if the -old backup
+        already exists. If the parent installation fails after the rename,
+        the original "conffile" is restored.
 
   ACTION_install
     This action is responsible for renaming files, replacing SPc.pm paths to

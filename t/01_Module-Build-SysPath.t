@@ -78,6 +78,13 @@ for my $type (Sys::Path::SPc->_path_types) {
         File::Spec->catdir($ENV{SYSPATH_TEST_ROOT}, $type);
     };
 }
+if ($ENV{SYSPATH_TEST_FAIL_INSTALL}) {
+    require Module::Build;
+    no warnings 'redefine';
+    *Module::Build::ACTION_install = sub {
+        die "injected parent install failure\n";
+    };
+}
 1;
 PERL
         my @inc = map { '-I'.$_ } @INC;
@@ -100,7 +107,12 @@ PERL
             local $/;
             my $output = <$out>;
             close $out;
-            is($?, 0, "@args succeeded") or diag $output;
+            if ($ENV{SYSPATH_TEST_FAIL_INSTALL} or $ENV{SYSPATH_TEST_EXPECT_FAILURE}) {
+                isnt($?, 0, "@args failed as requested") or diag $output;
+            }
+            else {
+                is($?, 0, "@args succeeded") or diag $output;
+            }
             return $output;
         };
         my $source = File::Spec->catfile($dist, 'conf', 'acme-test-syspath.cfg');
@@ -147,7 +159,36 @@ PERL
                 'checksum reflects source changed after Build.PL');
         }
 
-        unlink($config) or die $!;
+        unlink($config.'-old') or die $!;
+        my $local_before_failure = "local configuration before failed install\n";
+        my $failed_version = "distribution version for failed install\n";
+        IO::Any->spew([$config], $local_before_failure);
+        IO::Any->spew([$source], $failed_version);
+        unlink($built) or die $!;
+        {
+            local $ENV{SYSPATH_TEST_FAIL_INSTALL} = 1;
+            $output = $run->("Y\n", 'Build', 'install');
+        }
+        like($output, qr/injected parent install failure/,
+            'parent install failure is reported');
+        is(-f $config ? IO::Any->slurp([$config]) : undef, $local_before_failure,
+            'failed parent install restores active configuration');
+        ok(!-e $config.'-old', 'rollback consumes temporary configuration backup');
+
+        my $existing_backup = "pre-existing configuration backup\n";
+        IO::Any->spew([$config.'-old'], $existing_backup);
+        {
+            local $ENV{SYSPATH_TEST_EXPECT_FAILURE} = 1;
+            $output = $run->("Y\n", 'Build', 'install');
+        }
+        like($output, qr/configuration backup .* already exists/,
+            'pre-existing configuration backup is reported');
+        is(IO::Any->slurp([$config]), $local_before_failure,
+            'backup collision leaves active configuration untouched');
+        is(IO::Any->slurp([$config.'-old']), $existing_backup,
+            'backup collision leaves existing backup untouched');
+
+        unlink($config) or die $! if -e $config;
         $run->('', 'Build.PL', '--install_base='.$system.'/perl');
         IO::Any->spew([$config], "created after Build.PL\n");
         $run->('', 'Build', 'install');
