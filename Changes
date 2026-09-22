@@ -6,6 +6,8 @@ Revision history for Module-Build-SysPath
       existing -old backups.
     - Protect every sysconfdir payload file as configuration, even when it is
       not explicitly listed in conffiles.
+    - Replace installed SPc modules atomically and abort before recording
+      checksums if rewriting fails.
 
 0.17    20 Sep 2014
     - qw now with () (required for new Perl versions) - thanks Slaven Rezić

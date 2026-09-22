@@ -14,8 +14,76 @@ use Text::Diff 'diff';
 use File::Spec;
 use File::Basename 'basename', 'dirname';
 use File::Path 'make_path';
+use File::Temp 'tempfile';
 
 our $sys_path_config_name = 'SPc';
+
+sub _spc_open_source {
+    my ($builder, $filename) = @_;
+    open(my $fh, '<', $filename) or die $!;
+    return $fh;
+}
+
+sub _spc_write {
+    my ($builder, $fh, $content) = @_;
+    print {$fh} $content or die $!;
+    return;
+}
+
+sub _spc_close {
+    my ($builder, $fh) = @_;
+    close($fh) or die $!;
+    return;
+}
+
+sub _spc_rename {
+    my ($builder, $source, $destination) = @_;
+    rename($source, $destination) or die $!;
+    return;
+}
+
+sub _rewrite_installed_spc {
+    my ($builder, $source, $destination, $path_types) = @_;
+    my $mode = (stat($destination))[2];
+    die "cannot stat '$destination': $!" if not defined $mode;
+    $mode &= oct('7777');
+
+    my ($source_fh, $temporary_fh, $temporary);
+    my $rewritten = eval {
+        ($temporary_fh, $temporary) = tempfile(
+            '.SPc.pm.XXXXXX', DIR => dirname($destination), UNLINK => 0,
+        );
+        $source_fh = $builder->_spc_open_source($source);
+        local $! = 0;
+        while (defined(my $line = <$source_fh>)) {
+            next if $line =~ m/# remove after install$/;
+            if ($line =~ m/^sub \s+ ($path_types) \s* {/xms) {
+                $line = 'sub '.$1." {'"
+                    .$builder->{'properties'}->{'spc'}->{'path'}->{$1}
+                    ."'};\n";
+            }
+            $builder->_spc_write($temporary_fh, $line);
+        }
+        die "cannot read '$source': $!" if $!;
+        $builder->_spc_close($source_fh, 'source');
+        undef $source_fh;
+        chmod($mode, $temporary)
+            or die "cannot chmod '$temporary': $!";
+        $builder->_spc_close($temporary_fh, 'destination');
+        undef $temporary_fh;
+        $builder->_spc_rename($temporary, $destination);
+        undef $temporary;
+        1;
+    };
+    my $rewrite_error = $@;
+    if (not $rewritten) {
+        eval { close($source_fh) } if $source_fh;
+        eval { close($temporary_fh) } if $temporary_fh;
+        unlink($temporary) if defined $temporary and -e $temporary;
+        die $rewrite_error;
+    }
+    return;
+}
 
 sub new {
 	my $class = shift;
@@ -248,26 +316,9 @@ sub ACTION_install {
         if not -f $module_filename;
     die 'no such file - '.$installed_module_filename
         if not -f $installed_module_filename;
-    unlink $installed_module_filename;
-    
-    # write the new version of SPc.pm
-    open(my $config_fh, '<', $module_filename) or die $!;
-    open(my $real_config_fh, '>', $installed_module_filename) or die $!;
-    while (my $line = <$config_fh>) {
-        next if ($line =~ m/# remove after install$/);
-        if ($line =~ m/^sub \s+ ($path_types) \s* {/xms) {
-            $line =
-                'sub '
-                .$1
-                ." {'"
-                .$builder->{'properties'}->{'spc'}->{'path'}->{$1}
-                ."'};\n"
-            ;
-        }
-        print $real_config_fh $line;
-    }
-    close($real_config_fh);
-    close($config_fh);
+    $builder->_rewrite_installed_spc(
+        $module_filename, $installed_module_filename, $path_types,
+    );
         
     # see https://rt.cpan.org/Ticket/Display.html?id=49579
     # ExtUtils::Install is forcing 0444 so we have to hack write permition after install :-/

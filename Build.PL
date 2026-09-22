@@ -19,13 +19,14 @@ my $builder = Module::Build->new(
         'File::Spec'      => 0,
         'File::Basename'  => 0,
         'File::Path'      => 2.07,    # Introduce make_path() and rm_tree() API extension.
+        'File::Temp'      => 0,
     },
     build_requires => {
         'Test::More'    => 0,
         'Test::Compile' => 0.08,
         'Test::Dirs'    => 0,
-        'File::Temp'    => 0,
         'File::Find::Rule' => 0,
+        'Monkey::Patch::Action' => 0,
     },
     add_to_cleanup      => [ 'Module-Build-SysPath-*' ],
     create_readme       => 1,

@@ -71,6 +71,7 @@ sub main {
         IO::Any->spew([''.$dist, 'TestPaths.pm'], <<'PERL');
 use Sys::Path::SPc;
 use File::Spec;
+use Monkey::Patch::Action qw(patch_package);
 no warnings 'redefine';
 for my $type (Sys::Path::SPc->_path_types) {
     no strict 'refs';
@@ -84,6 +85,22 @@ if ($ENV{SYSPATH_TEST_FAIL_INSTALL}) {
     *Module::Build::ACTION_install = sub {
         die "injected parent install failure\n";
     };
+}
+require Module::Build::SysPath;
+our @SPC_PATCHES;
+for my $operation (qw(open_source write close rename)) {
+    push @SPC_PATCHES, patch_package(
+        'Module::Build::SysPath', '_spc_'.$operation, 'wrap', sub {
+            my $context = shift;
+            my $failure = $operation eq 'open_source' ? 'open' : $operation;
+            if (($ENV{SYSPATH_TEST_FAIL_SPC} || '') eq $failure) {
+                $context->{'orig'}->(@_)
+                    if $failure eq 'close' and $_[2] eq 'destination';
+                die "injected SPc $failure failure\n";
+            }
+            return $context->{'orig'}->(@_);
+        },
+    );
 }
 1;
 PERL
@@ -227,6 +244,35 @@ PERL
         ok(!-e File::Spec->catfile($stage, $config.'-spc'), 'staged install has no -spc copy');
         is(IO::Any->slurp([$config]), "created after Build.PL\n", 'staging leaves live configuration intact');
         is(IO::Any->slurp([$checksum_file]), $checksums_before, 'staging leaves live checksums intact');
+
+        my $source_spc = File::Spec->catfile(
+            $dist, 'lib', 'Acme', 'Test', 'SysPath', 'SPc.pm',
+        );
+        my ($installed_spc) = File::Find::Rule->file->name('SPc.pm')->in(
+            File::Spec->catdir($system, 'perl'),
+        );
+        for my $failure (qw(open write close rename)) {
+            my $new_version = "configuration before SPc $failure failure\n";
+            IO::Any->spew([$source], $new_version);
+            unlink($built) or die $! if -e $built;
+            {
+                local $ENV{SYSPATH_TEST_EXPECT_FAILURE} = 1;
+                local $ENV{SYSPATH_TEST_FAIL_SPC} = $failure;
+                $output = $run->("N\n", 'Build', 'install');
+            }
+            like($output, qr/injected SPc $failure failure/,
+                "$failure failure is reported");
+            is(IO::Any->slurp([$installed_spc]), IO::Any->slurp([$source_spc]),
+                "$failure failure preserves the installed SPc module");
+            is(IO::Any->slurp([$checksum_file]), $checksums_before,
+                "$failure failure does not commit checksums");
+        }
+
+        $run->("N\n", 'Build', 'install');
+        isnt(IO::Any->slurp([$installed_spc]), IO::Any->slurp([$source_spc]),
+            'successful install transforms the SPc module');
+        is((stat($installed_spc))[2] & oct('7777'), oct('444'),
+            'transformed SPc module retains installed permissions');
     };
 
     return 0;
