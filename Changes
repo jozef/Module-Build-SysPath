@@ -1,6 +1,6 @@
 Revision history for Module-Build-SysPath
 
-0.20    unreleased
+0.20    15 November 2026
     - Add the perl-module-build-syspath agent skill in docs/skills/ describing
       how to install and locate files with Module::Build::SysPath and Sys::Path.
     - Install only files listed in MANIFEST when the distribution has one, and
