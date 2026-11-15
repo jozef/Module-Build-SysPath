@@ -110,8 +110,14 @@ contract is broken, the install dies.
   behavior.
 - After install, `sysconfdir` and `sharedstatedir` files are chmod 0644;
   other files keep ExtUtils::Install's 0444 (0555 for executables).
-  Ownership is never changed. Grant the runtime user or group access outside
-  the build, for example in packaging, provisioning, or docs.
+- A new file belongs to the installing user. The install never assigns
+  ownership, so grant the runtime user or group access outside the build,
+  for example in packaging, provisioning, or docs. From 0.20 on, a file that
+  replaces an existing one gets the replaced file's owner and group, and a
+  kept conffile and `-old` are not touched, so a `chgrp` survives upgrades.
+  A new `-spc` belongs to the installing user. As non-root, restoring
+  another owner fails with a warning. Up to 0.19, a replaced file belongs to
+  the installing user.
 - For files with secrets or other non-default permissions, pass
   `file_modes => { 'etc/acme-notes/db.ini' => 0640 }` to `new()` (0.20+).
   Do not write a custom `ACTION_install` chmod for this. Older versions ignore

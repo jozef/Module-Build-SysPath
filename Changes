@@ -8,6 +8,8 @@ Revision history for Module-Build-SysPath
       MANIFEST.SKIP excludes it. Installs from a checkout no longer deploy
       files that are missing from MANIFEST.
     - Add file_modes option to set the permissions of installed files
+    - Keep the owner and group of installed files that replace existing ones,
+      including a conffile whose new version is accepted and its -spc copy.
     - Install dot files listed in <path_type>_files.
     - Load and declare IO::Any, which is used to checksum configuration files.
     - Document <path_type>_files, MANIFEST filtering, seed file overwrites and

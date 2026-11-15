@@ -289,6 +289,7 @@ sub new {
     $builder->notes('configuration_files' => \%configuration_files);
     $builder->notes('writefiles_in_system' => \@writefiles_in_system);
     $builder->notes('create_folders_in_system' => \@create_folders_in_system);
+    $builder->notes('payload_destinations' => [ sort values %payload_destinations ]);
 
     $builder->notes('installed_file_modes' =>
         $builder->_installed_file_modes(\%payload_destinations));
@@ -350,10 +351,20 @@ sub ACTION_install {
         }
         $final_modes{$target} = $mode;
     };
+    # ExtUtils::Install replaces a file with a new one owned by the installing
+    # user; remember owners to give replaced files back to them.
+    my %owners;
+    my $remember_owner = sub {
+        my ($destination) = @_;
+        my $target = File::Spec->catfile($destdir || (), $destination);
+        my @stat = lstat($target);
+        $owners{$target} = [ @stat[4, 5] ] if @stat and -f _;
+    };
     # Snapshot before the parent installer changes permissions or replaces files.
     foreach my $destination (keys %declared_modes) {
         $remember_mode->($destination, $declared_modes{$destination});
     }
+    $remember_owner->($_) foreach @{$builder->notes('payload_destinations') || []};
     my @writefiles_in_system = @{$builder->notes('writefiles_in_system')};
     if (not $destdir) {
         my %configuration_files = %{$builder->notes('configuration_files')};
@@ -376,6 +387,7 @@ sub ACTION_install {
             }
             else {
                 $alternate_files{$file} = $file.'-spc';
+                $remember_owner->($dest_file.'-spc');
                 $remember_mode->($dest_file.'-spc', $declared_modes{$dest_file})
                     if exists $declared_modes{$dest_file};
                 @writefiles_in_system = map {
@@ -460,13 +472,34 @@ sub ACTION_install {
     $builder->_rewrite_installed_spc(
         $module_filename, $installed_module_filename, $path_types,
     );
-        
+
+    _restore_owners(\%owners);
     _apply_install_modes($destdir, \@writefiles_in_system, \%final_modes);
 
     # record md5sum of new distribution conffiles (only when really installing to system)
     Sys::Path->install_checksums(%conffiles_in_system)
         if (not $destdir);
     
+    return;
+}
+
+# Give installed files that replaced existing ones the owner and group of the
+# replaced file. A failed chown only warns, because the files are installed.
+sub _restore_owners {
+    my ($owners) = @_;
+
+    foreach my $target (sort keys %{$owners}) {
+        my @stat = lstat($target);
+        next if not @stat or not -f _;
+        my ($uid, $gid) = @{$owners->{$target}};
+        next if $stat[4] == $uid and $stat[5] == $gid;
+        chown(
+            ($stat[4] == $uid ? -1 : $uid),
+            ($stat[5] == $gid ? -1 : $gid),
+            $target,
+        ) or warn sprintf("cannot restore owner %d:%d of '%s': %s\n",
+            $uid, $gid, $target, $!);
+    }
     return;
 }
 
@@ -749,10 +782,27 @@ failed installation, a secret file can be readable by every local user who
 can reach its folder. Deployments that need stronger guarantees should
 install through a distribution package that sets permissions while copying.
 
+=head3 Owner and group
+
+Installation never assigns an owner or group of its own. A new file belongs
+to the user running the installation. When a file that already exists in the
+system is replaced, the new file gets the owner and group of the replaced
+file, so a C<chgrp> of a secret C<conffile> to the group of a service
+survives upgrades. This covers payload files of every path type, the
+F<-spc> copy of a kept C<conffile> and, when the new version of a
+C<conffile> is accepted, the newly installed C<conffile>. A kept C<conffile>
+and an F<-old> backup are not replaced, so they keep their owner and group.
+With C<--destdir>, the same applies to the staged files.
+
+Only root can give a file to another user. If restoring the owner or group
+fails, the installation warns with the path and continues.
+
 =head2 ACTION_install
 
 This action is responsible for renaming files, replacing F<SPc.pm> paths
-to systems once from L<Sys::Path>. Also sets undeclared C<sysconfdir> and
+to systems once from L<Sys::Path>. Also restores the owner and group of
+replaced files as described in L</Owner and group>, sets undeclared
+C<sysconfdir> and
 C<sharedstatedir> files to C<0644>, applies C<file_modes> as described in
 L</File modes>, and stores the
 checksums of C<conffile>s.

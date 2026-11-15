@@ -233,11 +233,26 @@ EXAMPLE
     need stronger guarantees should install through a distribution package
     that sets permissions while copying.
 
+   Owner and group
+    Installation never assigns an owner or group of its own. A new file
+    belongs to the user running the installation. When a file that already
+    exists in the system is replaced, the new file gets the owner and group
+    of the replaced file, so a "chgrp" of a secret "conffile" to the group
+    of a service survives upgrades. This covers payload files of every path
+    type, the -spc copy of a kept "conffile" and, when the new version of a
+    "conffile" is accepted, the newly installed "conffile". A kept
+    "conffile" and an -old backup are not replaced, so they keep their owner
+    and group. With "--destdir", the same applies to the staged files.
+
+    Only root can give a file to another user. If restoring the owner or
+    group fails, the installation warns with the path and continues.
+
   ACTION_install
     This action is responsible for renaming files, replacing SPc.pm paths to
-    systems once from Sys::Path. Also sets undeclared "sysconfdir" and
-    "sharedstatedir" files to 0644, applies "file_modes" as described in
-    "File modes", and stores the checksums of "conffile"s.
+    systems once from Sys::Path. Also restores the owner and group of
+    replaced files as described in "Owner and group", sets undeclared
+    "sysconfdir" and "sharedstatedir" files to 0644, applies "file_modes" as
+    described in "File modes", and stores the checksums of "conffile"s.
 
 AUTHOR
     Jozef Kutej, <jkutej@cpan.org>

@@ -89,7 +89,8 @@ If `notes.ini` held a password, require 0.20 in `configure_requires` and
 `build_requires` (older versions ignore the option silently), and
 restrict it after install with
 `file_modes => { 'etc/acme-notes/notes.ini' => 0640 }`. Set its group outside
-the build, because the install never changes ownership.
+the build, because a new file belongs to the installing user. From 0.20 on,
+upgrades keep that group.
 
 ## Custom build actions
 
