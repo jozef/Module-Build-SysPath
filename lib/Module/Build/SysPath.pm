@@ -3,7 +3,7 @@ package Module::Build::SysPath;
 use warnings;
 use strict;
 
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 
 use base 'Module::Build';
 use Sys::Path 0.11;
@@ -14,6 +14,8 @@ use Text::Diff 'diff';
 use File::Spec;
 use File::Temp 'tempfile';
 use Path::Tiny 'path';
+use IO::Any;
+use ExtUtils::Manifest ();
 use B 'perlstring';
 
 our $sys_path_config_name = 'SPc';
@@ -126,6 +128,46 @@ sub _rewrite_installed_spc {
     return;
 }
 
+# Return a callback that is true for files to leave out because a MANIFEST
+# exists and does not list them. It warns unless MANIFEST.SKIP excludes the
+# file on purpose.
+sub _manifest_filter {
+    my ($builder, $distribution_root) = @_;
+
+    my $manifest_file = $distribution_root->child('MANIFEST');
+    return sub { 0 } if not $manifest_file->is_file;
+    my $manifest = ExtUtils::Manifest::maniread("$manifest_file");
+
+    my $manifest_skip_file = $distribution_root->child('MANIFEST.SKIP');
+    my $manifest_skip = ExtUtils::Manifest::maniskip(
+        $manifest_skip_file->is_file
+            ? "$manifest_skip_file"
+            : $ExtUtils::Manifest::DEFAULT_MSKIP
+    );
+
+    return sub {
+        my ($file) = @_;
+        return 0 if exists $manifest->{$file};
+        $builder->log_warn("'$file' is not listed in MANIFEST and will not be installed\n")
+            if not $manifest_skip->($file);
+        return 1;
+    };
+}
+
+# True for files that are installed only when listed in <path_type>_files:
+# files in non-persistent folders, in dot folders, and dot files other
+# than .exists.
+sub _skipped_unless_wanted {
+    my ($source_path, $file, $wanted_files, $non_persistant, $ignore_folders) = @_;
+
+    return 0 if exists $wanted_files->{$file};
+    return 1 if $non_persistant;
+    return 1 if any { $_->subsumes($source_path) } @{$ignore_folders};
+
+    my $basename = $source_path->basename;
+    return substr($basename, 0, 1) eq '.' && $basename ne '.exists';
+}
+
 sub new {
 	my $class = shift;
 	my $builder = $class->SUPER::new(@_);
@@ -144,6 +186,8 @@ sub new {
         Sys::Path->find_distribution_root($builder->module_name)
     )->absolute;
     print 'dist root is ', $distribution_root, "\n";
+
+    my $skip_unlisted = $builder->_manifest_filter($distribution_root);
     
     # map conf files to array of real paths
     my @conffiles = (
@@ -161,7 +205,7 @@ sub new {
         my $sys_path     = path($module->$path_type)->absolute;
         my $install_path = path(Sys::Path->$path_type)->absolute;
         
-        $builder->{'properties'}->{$path_type.'_files'} ||= {};
+        my $wanted_files = $builder->{'properties'}->{$path_type.'_files'} ||= {};
 
         # store for install time retrieval
         $spc_properties{'path'}->{$path_type} = $install_path;
@@ -189,7 +233,7 @@ sub new {
                     # ignore folders with . prefix
                     push @ignore_folders, $source_path
                         if substr($source_path->basename, 0, 1) eq '.'
-                        and not exists $builder->{'properties'}->{$path_type.'_files'}->{"$distribution_file"};
+                        and not exists $wanted_files->{"$distribution_file"};
 
                     next;
                 }
@@ -200,26 +244,16 @@ sub new {
                 $file = "$distribution_file";
                 
                 # allow empty directories to be created
-                push @create_folders_in_system, path($dest_file)->parent
-                    if (path($file)->basename eq '.exists');
-                
-                # skip non-persistant folders, only include explicitely wanted and .exists files
-                next if
-                    $non_persistant
-                    and (not exists $builder->{'properties'}->{$path_type.'_files'}->{$file})
-                ;
-                
-                # skip files from .folders, only include explicitely wanted
-                next if any {
-                    $_->subsumes($source_path)
-                    and (not exists $builder->{'properties'}->{$path_type.'_files'}->{$file})
-                } @ignore_folders;
-                
-                # skip files with . prefix
-                next if
-                    (substr($source_path->basename, 0, 1) eq '.')
-                    and ($source_path->basename ne '.exists')
-                ;
+                if (path($file)->basename eq '.exists') {
+                    next if $skip_unlisted->($file);
+                    push @create_folders_in_system, path($dest_file)->parent;
+                }
+
+                next if _skipped_unless_wanted(
+                    $source_path, $file, $wanted_files,
+                    $non_persistant, \@ignore_folders,
+                );
+                next if $skip_unlisted->($file);
                 
                 # print 'file>  ', $file, "\n";
                 # print 'bfile> ', $blib_file, "\n";
@@ -468,7 +502,53 @@ Folders in:
     sharedstatedir
 
 are skipped during the installation. Add F<.exists> to this folders if you
-want them to be created during `./Build install`.
+want them to be created during `./Build install`. The F<.exists> file itself
+is not installed.
+
+To install a specific file from a skipped folder, a file from a folder
+starting with a dot, or a file starting with a dot, list its path relative
+to the distribution root in the C<< <path_type>_files >> property:
+
+    my $builder = Module::Build::SysPath->new(
+        ...
+        sharedstatedir_files => {
+            'var/lib/acme-notes/index.json' => 1,
+        },
+        webdir_files => {
+            'www/.htaccess' => 1,
+        },
+    );
+
+Every C<./Build install> overwrites such a file with the distribution
+version, so runtime changes to it are lost. To keep them, also list the file
+in C<conffiles>, or create the file at runtime instead of shipping it.
+
+=head3 MANIFEST
+
+When the distribution root contains a F<MANIFEST>, only files listed in it
+are installed. C<perl Build.PL> warns about every other file it would have
+installed:
+
+    'etc/acme/secret.pem' is not listed in MANIFEST and will not be installed
+
+Files matching F<MANIFEST.SKIP> (or the default skip list of
+L<ExtUtils::Manifest> when there is no F<MANIFEST.SKIP>) are left out on
+purpose, so they are not installed and not reported.
+
+B<Files kept out of the tarball by F<MANIFEST.SKIP> are not installed from a
+checkout either.> If a checkout install must deploy such files, for example
+keys that should not be published, copy them in a custom C<ACTION_install>
+or deploy them outside the build.
+
+This keeps editor backups and other stray files in a checkout from being
+installed, and makes an install from a checkout match an install from the
+distribution tarball. Without a F<MANIFEST>, every file found is installed.
+
+B<Rerun C<perl Build.PL> after adding files.> The file list is collected
+from the folders on disk when C<perl Build.PL> runs, not when C<./Build
+install> runs.
+
+=head3 Configuration files
 
 Configuration files get a special (Debian like) treatment. All files in
 C<sysconfdir> and all files specified as C<< $builder->{'properties'}->{'conffiles'} >>
@@ -519,6 +599,14 @@ suffix F<-old> and distribution C<conffile> is installed. Installation aborts
 without changing either file if the F<-old> backup already exists. If the
 parent installation fails after the rename, the original C<conffile> is
 restored.
+
+Unattended installs take the default answer N: the system C<conffile> is
+kept and the distribution version is installed with the F<-spc> suffix. An
+install is unattended with C<PERL_MM_USE_DEFAULT=1>, or without a terminal
+when standard input is at end of file.
+
+A system C<conffile> without a recorded checksum counts as changed in the
+system.
 
 =back
 

@@ -73,8 +73,54 @@ EXAMPLE
         sharedstatedir
 
     are skipped during the installation. Add .exists to this folders if you
-    want them to be created during `./Build install`.
+    want them to be created during `./Build install`. The .exists file
+    itself is not installed.
 
+    To install a specific file from a skipped folder, a file from a folder
+    starting with a dot, or a file starting with a dot, list its path
+    relative to the distribution root in the "<path_type>_files" property:
+
+        my $builder = Module::Build::SysPath->new(
+            ...
+            sharedstatedir_files => {
+                'var/lib/acme-notes/index.json' => 1,
+            },
+            webdir_files => {
+                'www/.htaccess' => 1,
+            },
+        );
+
+    Every "./Build install" overwrites such a file with the distribution
+    version, so runtime changes to it are lost. To keep them, also list the
+    file in "conffiles", or create the file at runtime instead of shipping
+    it.
+
+   MANIFEST
+    When the distribution root contains a MANIFEST, only files listed in it
+    are installed. "perl Build.PL" warns about every other file it would
+    have installed:
+
+        'etc/acme/secret.pem' is not listed in MANIFEST and will not be installed
+
+    Files matching MANIFEST.SKIP (or the default skip list of
+    ExtUtils::Manifest when there is no MANIFEST.SKIP) are left out on
+    purpose, so they are not installed and not reported.
+
+    Files kept out of the tarball by MANIFEST.SKIP are not installed from a
+    checkout either. If a checkout install must deploy such files, for
+    example keys that should not be published, copy them in a custom
+    "ACTION_install" or deploy them outside the build.
+
+    This keeps editor backups and other stray files in a checkout from being
+    installed, and makes an install from a checkout match an install from
+    the distribution tarball. Without a MANIFEST, every file found is
+    installed.
+
+    Rerun "perl Build.PL" after adding files. The file list is collected
+    from the folders on disk when "perl Build.PL" runs, not when "./Build
+    install" runs.
+
+   Configuration files
     Configuration files get a special (Debian like) treatment. All files in
     "sysconfdir" and all files specified as
     "$builder->{'properties'}->{'conffiles'}" are configuration files. Using
@@ -121,6 +167,14 @@ EXAMPLE
         Installation aborts without changing either file if the -old backup
         already exists. If the parent installation fails after the rename,
         the original "conffile" is restored.
+
+        Unattended installs take the default answer N: the system "conffile"
+        is kept and the distribution version is installed with the -spc
+        suffix. An install is unattended with "PERL_MM_USE_DEFAULT=1", or
+        without a terminal when standard input is at end of file.
+
+        A system "conffile" without a recorded checksum counts as changed in
+        the system.
 
   ACTION_install
     This action is responsible for renaming files, replacing SPc.pm paths to
