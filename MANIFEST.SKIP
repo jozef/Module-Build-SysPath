@@ -32,6 +32,7 @@
 .*\.tar\.gz
 ^MYMETA.yml$
 ^TODO
+^docs/todo/
 ^Module-Build-SysPath-
 
 ^MYMETA\.json$

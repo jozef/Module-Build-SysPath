@@ -34,7 +34,7 @@ t/01_Module-Build-SysPath.t
 t/02_path-handling.t
 t/03-spc-rewrite.t
 t/04-install-failure-detection.t
-t/05-prerequisites.t
+t/06-file-modes.t
 t/lib/PostCopyFailure.pm
 t/lib/Sys/Path/SPc.pm
 t/tdirs/Acme-Test-SysPath.installed/etc/acme-test-syspath.cfg

@@ -199,6 +199,7 @@ sub new {
         'path_types' => [ $module->_path_types ],
     );
     my %configuration_files;
+    my %payload_destinations;
     my @writefiles_in_system;
     my @create_folders_in_system;
     foreach my $path_type ($module->_path_types) {
@@ -268,6 +269,8 @@ sub new {
 
                 # add file the the Build.PL _files list
                 $files{$file} = $blib_file;
+                $payload_destinations{$file} = "$dest_file"
+                    if path($file)->basename ne '.exists';
 
                 # make the conf and state files writable in the system
                 push @writefiles_in_system, $dest_file
@@ -286,8 +289,44 @@ sub new {
     $builder->notes('configuration_files' => \%configuration_files);
     $builder->notes('writefiles_in_system' => \@writefiles_in_system);
     $builder->notes('create_folders_in_system' => \@create_folders_in_system);
-    
+
+    $builder->notes('installed_file_modes' =>
+        $builder->_installed_file_modes(\%payload_destinations));
+
     return $builder;
+}
+
+# Validate the file_modes property and map it to installed destinations.
+sub _installed_file_modes {
+    my ($builder, $payload_destinations) = @_;
+
+    my %installed_file_modes;
+    return \%installed_file_modes
+        if not exists $builder->{'properties'}->{'file_modes'};
+    my $file_modes = $builder->{'properties'}->{'file_modes'};
+    die "file_modes must be a hash of dist-relative files and integer modes\n"
+        if ref($file_modes) ne 'HASH';
+    foreach my $file (keys %{$file_modes}) {
+        my $mode = $file_modes->{$file};
+        die "file_modes key '$file' must be relative to the distribution root\n"
+            if File::Spec->file_name_is_absolute($file)
+            or any { $_ eq '..' } File::Spec->splitdir($file);
+        # A numeric literal never stringifies with a leading zero, so this
+        # rejects quoted octal strings such as '0640', which Perl reads as decimal.
+        die "file_modes has invalid mode for '$file': use an unquoted"
+            ." octal literal in 0000..0777\n"
+            if not defined($mode) or ref($mode)
+            or $mode !~ /\A[0-9]+\z/ or $mode =~ /\A0[0-9]/
+            or $mode > oct('777');
+        my $normalized = ''.path($file);
+        die "file_modes file '$file' is not a selected payload\n"
+            if not exists $payload_destinations->{$normalized};
+        my $destination = $payload_destinations->{$normalized};
+        die "file_modes declares '$normalized' more than once\n"
+            if exists $installed_file_modes{$destination};
+        $installed_file_modes{$destination} = 0 + $mode;
+    }
+    return \%installed_file_modes;
 }
 
 sub ACTION_install {
@@ -299,6 +338,22 @@ sub ACTION_install {
     my %conffiles_in_system;
     my %backup_files;
     my %alternate_files;
+    my %declared_modes = %{$builder->notes('installed_file_modes') || {}};
+    my %final_modes;
+    my $remember_mode = sub {
+        my ($destination, $mode) = @_;
+        my $target = File::Spec->catfile($destdir || (), $destination);
+        if (-e $target) {
+            my @stat = stat($target);
+            die "cannot stat '$target': $!\n" if not @stat;
+            $mode &= $stat[2] & oct('777');
+        }
+        $final_modes{$target} = $mode;
+    };
+    # Snapshot before the parent installer changes permissions or replaces files.
+    foreach my $destination (keys %declared_modes) {
+        $remember_mode->($destination, $declared_modes{$destination});
+    }
     my @writefiles_in_system = @{$builder->notes('writefiles_in_system')};
     if (not $destdir) {
         my %configuration_files = %{$builder->notes('configuration_files')};
@@ -316,9 +371,13 @@ sub ACTION_install {
                 )
             ) {
                 $backup_files{$dest_file} = $dest_file.'-old';
+                $final_modes{$dest_file.'-old'} = $final_modes{$dest_file}
+                    if exists $declared_modes{$dest_file};
             }
             else {
                 $alternate_files{$file} = $file.'-spc';
+                $remember_mode->($dest_file.'-spc', $declared_modes{$dest_file})
+                    if exists $declared_modes{$dest_file};
                 @writefiles_in_system = map {
                     $_ eq $dest_file ? $_.'-spc' : $_
                 } @writefiles_in_system;
@@ -402,16 +461,32 @@ sub ACTION_install {
         $module_filename, $installed_module_filename, $path_types,
     );
         
-    # see https://rt.cpan.org/Ticket/Display.html?id=49579
-    # ExtUtils::Install is forcing 0444 so we have to hack write permition after install :-/
-    foreach my $writefile (@writefiles_in_system) {
-        chmod 0644, File::Spec->catfile($destdir || (), $writefile) or die $!;
-    }
-    
+    _apply_install_modes($destdir, \@writefiles_in_system, \%final_modes);
+
     # record md5sum of new distribution conffiles (only when really installing to system)
     Sys::Path->install_checksums(%conffiles_in_system)
         if (not $destdir);
     
+    return;
+}
+
+# Set final permissions of installed files: declared modes from %$final_modes,
+# 0644 for the other writable system files.
+sub _apply_install_modes {
+    my ($destdir, $writefiles_in_system, $final_modes) = @_;
+
+    # see https://rt.cpan.org/Ticket/Display.html?id=49579
+    # ExtUtils::Install is forcing 0444 so we have to hack write permition after install :-/
+    foreach my $writefile (@{$writefiles_in_system}) {
+        my $target = File::Spec->catfile($destdir || (), $writefile);
+        next if exists $final_modes->{$target};
+        chmod 0644, $target or die $!;
+    }
+    foreach my $target (sort keys %{$final_modes}) {
+        my $mode = $final_modes->{$target};
+        chmod($mode, $target)
+            or die sprintf("cannot chmod '%s' to %04o: %s\n", $target, $mode, $!);
+    }
     return;
 }
 
@@ -610,11 +685,77 @@ system.
 
 =back
 
+=head3 File modes
+
+Set the permissions of installed files with C<file_modes>. Keys are paths
+relative to the distribution root, values are modes written as Perl octal
+literals:
+
+    my $builder = Module::Build::SysPath->new(
+        ...
+        file_modes => {
+            'etc/acme/secret.ini' => 0640,
+        },
+    );
+
+Write the mode unquoted. A quoted C<'0640'> would be read as a decimal
+number, so quoted modes with a leading zero are rejected.
+
+Every key must name a single file that is already selected for installation.
+C<file_modes> does not select files: it neither bypasses F<MANIFEST> nor
+replaces C<< <path_type>_files >>. A C<file_modes> value that is not a hash,
+keys naming unselected files, the same file twice (for example F<etc/x>
+and F<./etc/x>), directories, globs, F<.exists> markers,
+absolute paths or paths leaving the distribution root, and modes outside
+C<0000..0777> or non-integer modes make C<perl Build.PL> die.
+
+A declared mode is a ceiling. It never grants access that the file in the
+system does not already have:
+
+=over 4
+
+=item new file
+
+Gets the declared mode.
+
+=item existing file
+
+Gets the declared mode combined (bitwise AND) with its current mode. With
+C<0640> declared, a C<0644> file becomes C<0640> and a C<0600> file stays
+C<0600>. This also applies to a kept C<conffile>, its F<-spc> copy and an
+F<-old> backup, whose current mode is the mode of the replaced C<conffile>,
+so a C<0644> original becomes a C<0640> backup. A new
+F<-spc> copy is limited only by an existing F<-spc>, not by the mode of the
+kept C<conffile>.
+
+=item C<--destdir>
+
+The same rules apply to the staged files under the destination directory.
+Files in the live system are not touched.
+
+=back
+
+Without a declaration, files installed to C<sysconfdir> and
+C<sharedstatedir> are set to C<0644>, and other files keep the mode set by
+L<ExtUtils::Install> (C<0444>, or C<0555> for executables).
+
+If setting a declared mode fails, the installation dies with the path and
+mode, and no C<conffile> checksums are recorded.
+
+B<The declared mode is guaranteed only after a successful installation.>
+L<ExtUtils::Install> first installs every file with mode C<0444> (C<0555>
+for executables), and C<ACTION_install> sets the declared mode afterwards. Until then, and after a
+failed installation, a secret file can be readable by every local user who
+can reach its folder. Deployments that need stronger guarantees should
+install through a distribution package that sets permissions while copying.
+
 =head2 ACTION_install
 
 This action is responsible for renaming files, replacing F<SPc.pm> paths
-to systems once from L<Sys::Path>. Also makes files writable (chmod 0644).
-And stores the checksums of C<conffile>s.
+to systems once from L<Sys::Path>. Also sets undeclared C<sysconfdir> and
+C<sharedstatedir> files to C<0644>, applies C<file_modes> as described in
+L</File modes>, and stores the
+checksums of C<conffile>s.
 
 =head1 AUTHOR
 

@@ -176,10 +176,68 @@ EXAMPLE
         A system "conffile" without a recorded checksum counts as changed in
         the system.
 
+   File modes
+    Set the permissions of installed files with "file_modes". Keys are paths
+    relative to the distribution root, values are modes written as Perl
+    octal literals:
+
+        my $builder = Module::Build::SysPath->new(
+            ...
+            file_modes => {
+                'etc/acme/secret.ini' => 0640,
+            },
+        );
+
+    Write the mode unquoted. A quoted '0640' would be read as a decimal
+    number, so quoted modes with a leading zero are rejected.
+
+    Every key must name a single file that is already selected for
+    installation. "file_modes" does not select files: it neither bypasses
+    MANIFEST nor replaces "<path_type>_files". A "file_modes" value that is
+    not a hash, keys naming unselected files, the same file twice (for
+    example etc/x and ./etc/x), directories, globs, .exists markers,
+    absolute paths or paths leaving the distribution root, and modes outside
+    0000..0777 or non-integer modes make "perl Build.PL" die.
+
+    A declared mode is a ceiling. It never grants access that the file in
+    the system does not already have:
+
+    new file
+        Gets the declared mode.
+
+    existing file
+        Gets the declared mode combined (bitwise AND) with its current mode.
+        With 0640 declared, a 0644 file becomes 0640 and a 0600 file stays
+        0600. This also applies to a kept "conffile", its -spc copy and an
+        -old backup, whose current mode is the mode of the replaced
+        "conffile", so a 0644 original becomes a 0640 backup. A new -spc
+        copy is limited only by an existing -spc, not by the mode of the
+        kept "conffile".
+
+    "--destdir"
+        The same rules apply to the staged files under the destination
+        directory. Files in the live system are not touched.
+
+    Without a declaration, files installed to "sysconfdir" and
+    "sharedstatedir" are set to 0644, and other files keep the mode set by
+    ExtUtils::Install (0444, or 0555 for executables).
+
+    If setting a declared mode fails, the installation dies with the path
+    and mode, and no "conffile" checksums are recorded.
+
+    The declared mode is guaranteed only after a successful installation.
+    ExtUtils::Install first installs every file with mode 0444 (0555 for
+    executables), and "ACTION_install" sets the declared mode afterwards.
+    Until then, and after a failed installation, a secret file can be
+    readable by every local user who can reach its folder. Deployments that
+    need stronger guarantees should install through a distribution package
+    that sets permissions while copying.
+
   ACTION_install
     This action is responsible for renaming files, replacing SPc.pm paths to
-    systems once from Sys::Path. Also makes files writable (chmod 0644). And
-    stores the checksums of "conffile"s.
+    systems once from Sys::Path. Also sets undeclared "sysconfdir" and
+    "sharedstatedir" files to 0644, applies "file_modes" as described in
+    "File modes", and stores the checksums of "conffile"s.
 
 AUTHOR
     Jozef Kutej, <jkutej@cpan.org>

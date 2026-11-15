@@ -108,9 +108,30 @@ contract is broken, the install dies.
   `Sys::Path->sharedstatedir/syspath/install-checksums.json`. With `--destdir`,
   there is no prompt and no checksum, so a staged install cannot test upgrade
   behavior.
-- After install, `sysconfdir` and `sharedstatedir` files are chmod 0644.
-  Ownership is never changed. Grant the runtime user write access outside the
-  build, for example in packaging, provisioning, or docs.
+- After install, `sysconfdir` and `sharedstatedir` files are chmod 0644;
+  other files keep ExtUtils::Install's 0444 (0555 for executables).
+  Ownership is never changed. Grant the runtime user or group access outside
+  the build, for example in packaging, provisioning, or docs.
+- For files with secrets or other non-default permissions, pass
+  `file_modes => { 'etc/acme-notes/db.ini' => 0640 }` to `new()` (0.20+).
+  Do not write a custom `ACTION_install` chmod for this. Older versions ignore
+  `file_modes` silently and install the file 0644, so require 0.20 in
+  `configure_requires` and `build_requires`.
+- `file_modes` keys are dist-relative paths of single files that are already
+  selected for install. `file_modes` selects nothing. Directories, globs,
+  `.exists`, unselected or outside-root paths, the same file twice (`etc/x`
+  and `./etc/x`), and modes outside `0000..0777` make `perl Build.PL` die.
+  Write the mode as an unquoted octal literal; a quoted `'0640'` is rejected.
+- A `file_modes` mode is a ceiling: a new file gets it, an existing file gets
+  `declared & current`, so an admin's 0600 survives an upgrade and 0644
+  becomes 0640. The same applies to a kept conffile, to a `<file>-spc`
+  (bounded by an existing `-spc`, not by the live file), and to
+  `<file>-old`, which starts from the replaced file's mode. With
+  `--destdir`, it applies to the staged files only.
+- A `file_modes` mode is set only after a successful install. ExtUtils::Install
+  first installs with 0444 (0555 for executables), so the file is world-readable
+  during the install and after a failed one if its directory is reachable. Do
+  not promise more. Where that matters, deploy through a distribution package.
 
 ## Pitfalls
 

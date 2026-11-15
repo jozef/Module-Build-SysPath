@@ -85,6 +85,12 @@ $builder->create_build_script();
 Files under `sysconfdir` are conffiles automatically. To protect a file that
 lives under another type, add `conffiles => [qw(share/acme-notes/x.conf)]`.
 
+If `notes.ini` held a password, require 0.20 in `configure_requires` and
+`build_requires` (older versions ignore the option silently), and
+restrict it after install with
+`file_modes => { 'etc/acme-notes/notes.ini' => 0640 }`. Set its group outside
+the build, because the install never changes ownership.
+
 ## Custom build actions
 
 ```perl
